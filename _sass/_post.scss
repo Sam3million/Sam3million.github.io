@@ -1,0 +1,345 @@
+// style declarations for blog posts
+
+.post-header {
+    margin-bottom: 15px;
+}
+
+.post-title {
+    font-size: $post-title-size;
+}
+
+.post-meta {
+    font-size: 17px;
+}
+
+.post-content {
+    font-family: Merriweather;
+    font-size: 18px;
+    font-weight: 300;
+    margin: 0 10px 0px 10px;
+    line-height: 29px;
+
+    h4 {
+        margin: 45px 0px -10px 0px;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    h2 {
+        margin: 55px 0px -10px 0px;
+        font-size: 24px;
+        font-weight: 900;
+
+        &:before {
+            content: "## ";
+            color: #aaa;
+        }
+    }
+
+    h1 {
+        margin: 65px 0px -5px 0px;
+        font-size: 30px;
+        font-weight: 900;
+
+        &:before {
+            content: "# ";
+            color: #aaa;
+        }
+    }
+
+    &>ul, &>ol {
+        margin-top: 30px;
+        margin-bottom: 30px;
+    }
+
+    ul, ol {
+        margin-left: 30px;
+
+        li {
+            p {
+                margin: 15px 0px;
+            }
+            pre {
+                margin: 0;
+            }
+        }
+    }
+
+    img {
+        width: 100%;
+        border-radius: 15px;
+        border: 2px solid darken($grey-bg-color, 20);
+        margin: -10px 0;
+    }
+
+    img + em {
+        margin-top: 10px;
+        display: block;
+        margin-left: 20px;
+        margin-right: 20px;
+        color: darken($grey-bg-color, 60);
+        font-style: normal;
+        text-align: center;
+        font-size: 16px;
+    }
+
+    p {
+        margin: 30px 0px;
+
+        & > small {
+            font-size: 14px;
+            display: block;
+            line-height: 25px;
+        }
+    }
+
+    hr {
+        border: none;
+        border-top: 1px solid darken($grey-bg-color, 20);
+        margin: 0 20%;
+    }
+
+    code {
+        $inline-code-bg: #f4f4f0;
+        font-family: $mono-font;
+        background-color: $inline-code-bg;
+        border-radius: 5px;
+        border: 1px solid darken($inline-code-bg, 5%);
+        padding: 2px 4px;
+        white-space: nowrap;
+    }
+
+    pre {
+        border: 1px solid darken($grey-bg-color, 15%);
+        border-radius: 5px;
+        padding: 2px 5px;
+        margin: -7px 0px;
+        overflow: auto;
+        line-height: 26px;
+        & > code {
+            white-space: pre;
+            font-family: $mono-font;
+            padding: 2px 2px;
+            border: none;
+            background: none;
+        }
+    }
+
+    a {
+        transition: box-shadow 400ms, background-color 400ms;
+        border-radius: 5px;
+
+        &:hover {
+            box-shadow: 0 0 0px 5px $grey-bg-color;
+            background-color: $grey-bg-color;
+        }
+    }
+
+    blockquote {
+        color: #888;
+        border-left: 3px solid #aaa47a;
+        padding-left: 13px;
+    }
+}
+
+.post-bottom {
+    width: 50px;
+    margin: 70px auto 60px auto;
+    display: block;
+    opacity: 0.7;
+}
+
+.tldr {
+    border: 2px solid darken($grey-bg-color, 10);
+    border-radius: 5px;
+    margin: 30px 50px;
+    padding: 10px;
+    font-size: 16px;
+
+    h1 {
+        font-family: "Fira Sans";
+        color: darken($link-color, 3);
+        font-size: 22px;
+        text-align: center;
+        margin-bottom: 22px;
+        margin-top: 8px;
+
+        &:before {
+            content: "";
+        }
+    }
+
+    ul {
+        li {
+            line-height: 25px;
+            margin: 5px 0px;
+        }
+    }
+}
+
+.comments-container {
+    max-height: 250px;
+    min-height: 250px;
+    position: relative;
+    overflow: hidden;
+
+    .comments-gradient {
+        position: absolute;
+        top: 130px;
+        height: 120px;
+        background: linear-gradient(
+            to bottom,
+            transparent,
+            rgba($bg-color, 0.4),
+            rgba($bg-color, 0.9),
+            $bg-color
+        );
+        z-index: 10;
+        width: 100%;
+
+        button {
+            background:none!important;
+            border:none;
+            padding:0!important;
+            font: inherit;
+            cursor: pointer;
+
+            color: $link-color;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+            font-size: 20pt;
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            height: 55px;
+
+            &:focus {
+                outline: none;
+            }
+
+            &:hover {
+                color: lighten($link-color, 8%);
+            }
+        }
+    }
+}
+
+table {
+    margin: 24px 0;
+    border-collapse: collapse;
+    font-size: 16px;
+    font-family: "Fira Sans";
+
+    td, th {
+        border: 1px solid #ddd;
+        padding: 2px 6px;
+    }
+
+    th {
+        text-weight: bold;
+        background-color: #eee;
+    }
+}
+
+.full-width-container {
+    overflow-x: auto;
+    width: calc(100vw - 32px);
+    position: relative;
+    left: calc(-50vw + 50% + 16px);
+}
+
+.framework-comparison {
+    width: 100%;
+    max-width: 1200px;
+    min-width: 900px;
+    margin: 24px auto;
+    table-layout: fixed;
+    th {
+        background-color: #53abe6;
+        border: none;
+
+        &:first-child {
+            border-left: 1px solid #53abe6;
+        }
+        &:last-child {
+            border-right: 1px solid #53abe6;
+        }
+    }
+
+    td {
+        vertical-align: top;
+        line-height: 1.3;
+        padding: 6px 8px;
+    }
+
+    .table-heading {
+        text-align: left;
+        font-style: italic;
+    }
+}
+
+.table-sep {
+    height: 16px;
+}
+
+@media only screen and (min-width: 850px) {
+    .post-content {
+        p {
+            text-align: justify;
+            hyphens: auto;
+        }
+    }
+}
+
+@media only screen and (max-width: 600px) {
+    .post-title {
+        font-size: 27px;
+    }
+
+    .post-meta {
+        font-size: 14px;
+    }
+
+    table {
+        font-size: 14px;
+    }
+
+
+    .post-content {
+        margin: 0 5px;
+        font-size: 15px;
+        line-height: 25px;
+
+        p {
+            margin: 20px 0px;
+
+            code {
+                white-space: normal;
+            }
+        }
+
+        h1 {
+            font-size: 24px;
+            line-height: 29px;
+        }
+
+        h2 {
+            font-size: 20px;
+            line-height: 26px;
+        }
+    }
+
+    .tldr {
+        margin: 20px 15px;
+        padding: 3px;
+        font-size: 14px;
+
+        ul {
+            margin-left: 20px;
+        }
+
+        h1 {
+            font-size: 19px;
+            margin-bottom: 15px;
+        }
+    }
+}
