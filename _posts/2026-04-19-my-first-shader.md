@@ -1,6 +1,7 @@
 ---
-layout: default
+layout: post
 title: "Unity Grass Shader"
+date: 2026-04-19
 ---
 
 ### The Project
