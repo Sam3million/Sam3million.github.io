@@ -1,32 +1,28 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2575.3">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000}
-    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; -webkit-text-stroke: #000000; min-height: 14.0px}
-    span.s1 {font-kerning: none}
-  </style>
-</head>
-<body>
-<p class="p1"><span class="s1">---</span></p>
-<p class="p1"><span class="s1">layout: default</span></p>
-<p class="p1"><span class="s1">title: Home</span></p>
-<p class="p1"><span class="s1">---</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1">&lt;h2&gt;Projects&lt;/h2&gt;</span></p>
-<p class="p1"><span class="s1">&lt;ul&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>{% for post in site.posts %}</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;li&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;span class="post-date"&gt;{{ post.date | date: "%b %-d, %Y" }}&lt;/span&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;h3&gt;&lt;a href="{{ post.url }}"&gt;{{ post.title }}&lt;/a&gt;&lt;/h3&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>&lt;p&gt;{{ post.excerpt }}&lt;/p&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/li&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>{% endfor %}</span></p>
-<p class="p1"><span class="s1">&lt;/ul&gt;</span></p>
-</body>
-</html>
+---
+layout: default
+---
+
+<div class="home">
+
+  <div class="blog-desc">A blog about game development, computer graphics, and other stuff.</div>
+
+  <div class="index-sep"></div>
+
+  <ul class="post-list">
+    {% for post in site.posts %}
+      <li>
+        <h2>
+          <a class="post-title" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+        </h2>
+        <div class="post-excerpt">{{ post.excerpt }}</div>
+        <a class="continue-read" href="{{ post.url | prepend: site.baseurl }}">
+          Continue reading
+          <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+            <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+          </svg>
+        </a>
+        <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
