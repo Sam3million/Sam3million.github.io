@@ -1,0 +1,10 @@
+title: Samuel Rose | Graphics Programmer
+email: samuelrose099@gmail.com
+description: "Portfolio specializing in real-time rendering and shaders."
+baseurl: "" # Leave empty
+url: "https://Sam3million.github.io"
+
+# Build settings
+theme: minima # We will override this with your custom CSS later
+plugins:
+  - jekyll-feed

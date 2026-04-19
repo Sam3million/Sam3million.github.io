@@ -1,0 +1,63 @@
+// basic style declarations needed on every page
+
+// align whole page in the center
+@mixin page-center() {
+    width: 90%;
+    max-width: 830px;
+    margin: 0 auto;
+}
+
+// resets browser default styles
+body, h1, h2, h3, h4, h5, h6, p, blockquote, pre, hr, dl, dd, ol, ul, figure {
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    height: 100%;
+}
+
+body {
+    background-color: $bg-color;
+    font-family: $main-font;
+    font-weight: 300;
+    height: 100%;
+    min-width: 350px;
+}
+
+a {
+    text-decoration: none;
+    color: $link-color;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+#all {
+    min-height: 100%;
+}
+
+#center-all {
+    @include page-center();
+    padding: 0px;
+    padding-bottom: $footer-height;
+    position: relative;
+}
+
+.page-content {
+    padding: 0 10px;
+}
+
+
+@media only screen and (max-width: 600px) {
+    .page-content {
+        padding: 0 3px;
+    }
+
+    #center-all {
+        width: 95%;
+    }
+}
+
+@import "header", "footer", "post", "index";
