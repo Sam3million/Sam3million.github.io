@@ -76,19 +76,19 @@ I also added a weighting to the number of blades to spawn based on the area of t
 the same number of blades as large ones, causing a non-uniform distribution across the mesh. Triangles with area 1 receive
 about `triangleSampleFactor` blades, triangles with area 0.5 receive about half as many, and so on.
 ```cpp
-  [numthreads(64,1,1)]
-  void CSMain (uint3 id : SV_DispatchThreadID)
-  {
-    if(id.x >= triangleCount * triangleSampleFactor) return;
-    uint triangleIndex = id.x / triangleSampleFactor;
-    uint bladeIndex = id.x % triangleSampleFactor;
-    int3 indexGroup = triangleBuffer[triangleIndex];
-    vertdata vertex0 = vertexBuffer[indexGroup.x];
-    vertdata vertex1 = vertexBuffer[indexGroup.y];
-    vertdata vertex2 = vertexBuffer[indexGroup.z];
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+  if(id.x >= triangleCount * triangleSampleFactor) return;
+  uint triangleIndex = id.x / triangleSampleFactor;
+  uint bladeIndex = id.x % triangleSampleFactor;
+  int3 indexGroup = triangleBuffer[triangleIndex];
+  vertdata vertex0 = vertexBuffer[indexGroup.x];
+  vertdata vertex1 = vertexBuffer[indexGroup.y];
+  vertdata vertex2 = vertexBuffer[indexGroup.z];
       
-    float area = length(Normal(vertex0.vertex, vertex1.vertex, vertex2.vertex));
-    if(bladeIndex > round(area * triangleSampleFactor)) return;
+  float area = length(Normal(vertex0.vertex, vertex1.vertex, vertex2.vertex));
+  if(bladeIndex > round(area * triangleSampleFactor)) return;
   ...
 ```
 
@@ -97,27 +97,44 @@ This includes things like height, width, bend, wind offset, and facing direction
 hashing and simplex noise for these properties.
 
 ```cpp
-  // Generate random facing direction
-  float3 u = normalize(float3(normal.y, -normal.x, 0));
-  // This should be a unit vector:
-  float3 v = cross(normal, u);
-  float theta = Random(posSeed ^ 382173) * 2.0f * 3.141592653589793f;
-  // This should also be a unit vector:
-  float3 grassDirection = cos(theta) * u + sin(theta) * v;
-  
-  // Generate random height and width
-  float height = max((SimplexNoise(pos * 0.1) * 0.5 + 0.5), 0.25);
-  float width  = max(SimplexNoise(pos * 0.1 + float3(-602.4912, -998.21, 412.145)) * 0.5 + 0.5, 0.25);
-  float bend   = SimplexNoise(pos * 0.1 + float3(591.12, -123.44, -123.321)) * 0.5 + 0.5;
-  float wind   = SimplexNoise(pos * 0.1 + float3(223.981, -111.95, 223.45)) * 0.5 + 0.5;
+// Generate random facing direction
+float3 u = normalize(float3(normal.y, -normal.x, 0));
+// This should be a unit vector:
+float3 v = cross(normal, u);
+float theta = Random(posSeed ^ 382173) * 2.0f * 3.141592653589793f;
+// This should also be a unit vector:
+float3 grassDirection = cos(theta) * u + sin(theta) * v;
 
-  GrassInfo g;
+// Generate random height and width
+float height = max((SimplexNoise(pos * 0.1) * 0.5 + 0.5), 0.25);
+float width  = max(SimplexNoise(pos * 0.1 + float3(-602.4912, -998.21, 412.145)) * 0.5 + 0.5, 0.25);
+float bend   = SimplexNoise(pos * 0.1 + float3(591.12, -123.44, -123.321)) * 0.5 + 0.5;
+float wind   = SimplexNoise(pos * 0.1 + float3(223.981, -111.95, 223.45)) * 0.5 + 0.5;
+
+GrassInfo g;
   
-  // Store properties and write
-  ...
+// Store properties and write
+...
 ```
 
+# Culling
+This is the most important stage and what makes rendering individual blades possible.
+We want to only render blades that are on screen. To do this, we're going to use the scan-and-compact algorithm.
+The purpose of this algorithm is to determine which blades are visible, and then place those blades into a compact 
+output buffer (meaning no empty space between instance data). The GPU expects the instance data buffer to be compact, so this is necessary.
+In this algorithm, you first mark instances as visible or not in a visibility buffer (1 meaning visible, 0 meaning not visible),
+then compute a prefix sum of that visibility buffer. The prefix sum values tell you where to write your instance data in the compacted buffer.
 
+![Visualization of scan-and-compact](/assets/grass/"scan and compact.jpg")
+*Visualization of scan-and-compact*
+
+## Scan
+First we do a scan pass, where we mark blades as visible or not.
+Let's allocate a bit array, where the `Nth` bit signifies whether blade `N` is visible.
+We will represent this as a buffer of uints, each having 32 bits.
+```c#
+GraphicsBuffer BladeInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, (int)math.ceil(maxGrassCountPerChunk * MaxChunkCount / 32f), 4);
+```
 
 ![](/assets/tssv/sun.svg)
 *Left: unoccluded sun. Right: Sun partially occluded by scene geometry.*
