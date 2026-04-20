@@ -129,27 +129,13 @@ then compute a prefix sum of that visibility buffer. The prefix sum values tell 
 *Visualization of scan-and-compact*
 
 ## Scan
-First we do a scan pass, where we mark blades as visible or not.
+First we do a scan pass, where we figure out which blades are visible.
+Since our grass data is in chunks, we should first scan over entire chunks, marking them visible or not.
+
+
+
 Let's allocate a bit array, where the `Nth` bit signifies whether blade `N` is visible.
 We will represent this as a buffer of uints, each having 32 bits.
 ```c#
 GraphicsBuffer BladeInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, (int)math.ceil(maxGrassCountPerChunk * MaxChunkCount / 32f), 4);
 ```
-
-![](/assets/tssv/sun.svg)
-*Left: unoccluded sun. Right: Sun partially occluded by scene geometry.*
-
-Naturally, scene geometry could partially or fully block the circle, stopping some light from reaching the fragment.
-We need to determine what fraction of that light source disk is blocked by scene geometry.
-That directly gives us the shadow amount for that fragment.
-
-- For each fragment:
-    - `total_sun_occlusion := not occluded`
-    - For each shadow-casting triangle:
-        - Project onto that fragment's view of the sun disk
-        - Determine occlusion and add to `total_sun_occlusion`
-    - Return `total_sun_occlusion` as shadow amount
-
-Of course, doing this naively and looping through all scene triangles for each fragment would be extremely slow.
-To speed this up, I quickly cull large number of triangles in various stages so that each fragment only has to consider a small number of triangles.
-The culling step is explained in [this chapter](#culling) below.
