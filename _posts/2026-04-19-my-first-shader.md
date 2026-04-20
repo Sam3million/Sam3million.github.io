@@ -25,23 +25,99 @@ Memory usage is relatively cheap, as I make use of bit arrays, indexing, and dat
 </div>
 
 <br />
-
 *Context*:
 This was created as part of my ongoing open-world survival game project. Things like chunked grass blade buffer management were implemented but
 are not discussed in depth here. 
 
 ![My survival game project](/assets/grass/landscape.png)
 *My survival game project*
-
 <br />
 
-# Main idea
+# Introduction
 
 <!-- For simplicity, for most of this article, I am talking about the sun as light source: parallel light rays and  -->
-Our goal is to determine how much a particular fragment is shadowed.
-For now, let's focus on the sun: a sphere light source with parallel light rays in our scene.
-Imagine sitting at the fragment and looking at the sun (with protective glasses, of course!).
-You would see a disk, which we will assume has the same brightness at every point.
+Grass rendering is hot topic in computer graphics. There are many different techniques, but the most widely used approach is
+alpha-masked quads. This gives decent and cheap results, but loses out on realistic blade deformation and wind sway.
+
+<!--Put image of grass quad rendering here -->
+
+Another technique is to individually render each blade. This allows for each blade to have real geometry and actually be there in the world.
+Games like Ghost of Tsushima go all in on this approach, and the results speak for themselves.
+
+<!--Put image of GoT grass rendering here -->
+
+So why don't we see it more often in games? Well, unless it is implemented very carefully, the performance cost is massive.
+In this post I'm going to describe my (mostly careful) implementation of per-blade grass rendering.
+
+# Main Idea
+To render a field of grass that looks full enough, we need hundreds of thousands to millions of blades.
+We could place a million blade objects in our scene, press play, and call it a day, but that would cause most computers to explode.
+To make this even remotely possible, we need to use a technique known as GPU Instancing. This technique allows us to draw
+many copies of a mesh at different position offsets with a single draw call. This alone still isn't enough to make it performant, though.
+To take it to the next level, we need Indirect Instancing. What sets indirect instancing apart is that the number of instances is not 
+known by the CPU when it makes the draw call. That information lives completely in buffers on the GPU. What makes this so powerful
+is that we can perform culling on the grass blades in a compute shader prior to drawing them. That way, we're not wasting time drawing
+blades that aren't even on screen. We can also do things like separate the blades into LODs to further increase performance.
+
+
+# Blade Generation
+First off, we need to generate a buffer with grass blade positions. It should live on the GPU for later culling and rendering,
+so populating it with compute shader seems fitting. We want our grass blades to be positioned exactly on top of the terrain, so 
+we're going to need the terrain mesh data. We can bind each mesh's vertex and index buffers to our compute shader for access.
+The approach I used is as follows:
+- For each mesh triangle, dispatch `triangleSampleFactor` threads, each trying to produce a blade
+- For every thread
+    - Generate a random hash
+    - Using that hash, generate random barycentric coordinates describing a position on the triangle
+    - Create another hash from that position, and use it to generate a random float in the range 0-1
+    - If the float is less than some predefined value, atomically write the blade to the buffer
+
+I also added a weighting to the number of blades to spawn based on the area of the triangle, because tiny triangles would have 
+the same number of blades as large ones, causing a non-uniform distribution across the mesh. Triangles with area 1 receive
+about `triangleSampleFactor` blades, triangles with area 0.5 receive about half as many, and so on.
+```cpp
+  [numthreads(64,1,1)]
+  void CSMain (uint3 id : SV_DispatchThreadID)
+  {
+    if(id.x >= triangleCount * triangleSampleFactor) return;
+    uint triangleIndex = id.x / triangleSampleFactor;
+    uint bladeIndex = id.x % triangleSampleFactor;
+    int3 indexGroup = triangleBuffer[triangleIndex];
+    vertdata vertex0 = vertexBuffer[indexGroup.x];
+    vertdata vertex1 = vertexBuffer[indexGroup.y];
+    vertdata vertex2 = vertexBuffer[indexGroup.z];
+      
+    float area = length(Normal(vertex0.vertex, vertex1.vertex, vertex2.vertex));
+    if(bladeIndex > round(area * triangleSampleFactor)) return;
+  ...
+```
+
+If a blade survives the position hash, we should generate some per blade properties before writing it out.
+This includes things like height, width, bend, wind offset, and facing direction. I use a combination of
+hashing and simplex noise for these properties.
+
+```cpp
+  // Generate random facing direction
+  float3 u = normalize(float3(normal.y, -normal.x, 0));
+  // This should be a unit vector:
+  float3 v = cross(normal, u);
+  float theta = Random(posSeed ^ 382173) * 2.0f * 3.141592653589793f;
+  // This should also be a unit vector:
+  float3 grassDirection = cos(theta) * u + sin(theta) * v;
+  
+  // Generate random height and width
+  float height = max((SimplexNoise(pos * 0.1) * 0.5 + 0.5), 0.25);
+  float width  = max(SimplexNoise(pos * 0.1 + float3(-602.4912, -998.21, 412.145)) * 0.5 + 0.5, 0.25);
+  float bend   = SimplexNoise(pos * 0.1 + float3(591.12, -123.44, -123.321)) * 0.5 + 0.5;
+  float wind   = SimplexNoise(pos * 0.1 + float3(223.981, -111.95, 223.45)) * 0.5 + 0.5;
+
+  GrassInfo g;
+  
+  // Store properties and write
+  ...
+```
+
+
 
 ![](/assets/tssv/sun.svg)
 *Left: unoccluded sun. Right: Sun partially occluded by scene geometry.*
