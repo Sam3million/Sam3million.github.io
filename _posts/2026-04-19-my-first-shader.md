@@ -125,7 +125,7 @@ output buffer (meaning no empty space between instance data). The GPU expects th
 In this algorithm, you first mark instances as visible or not in a visibility buffer (1 meaning visible, 0 meaning not visible),
 then compute a prefix sum of that visibility buffer. The prefix sum values tell you where to write your instance data in the compacted buffer.
 
-![Visualization of scan-and-compact](/assets/grass/"scan and compact.jpg")
+![Visualization of scan-and-compact](/assets/grass/scan-and-compact.jpg)
 *Visualization of scan-and-compact*
 
 ## Scan
