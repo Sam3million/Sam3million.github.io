@@ -1,6 +1,18 @@
 <header id="site-header">
   <div id="header-title">
-    <img id="header-img" src="/img/totoroot.png">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
     <div id="header-link">
       <a href="/">{{ site.title }}</a>
     </div>

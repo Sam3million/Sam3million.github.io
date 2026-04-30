@@ -1,7 +1,8 @@
 ---
 layout: post
-title: "Unity Grass Shader"
+title: "GPU-driven Grass Rendering"
 date: 2026-04-19
+thumbnail: "/assets/grass/landscape.png"
 ---
 
 In this post I describe the GPU-driven grass rendering technique I implemented for my ongoing survival game project.
@@ -62,7 +63,7 @@ blades that aren't even on screen. We can also do things like separate the blade
 
 # Blade Generation
 First off, we need to generate a buffer with grass blade positions. It should live on the GPU for later culling and rendering,
-so populating it with compute shader seems fitting. We want our grass blades to be positioned exactly on top of the terrain, so 
+so populating it with a compute shader seems fitting. We want our grass blades to be positioned exactly on top of the terrain, so 
 we're going to need the terrain mesh data. We can bind each mesh's vertex and index buffers to our compute shader for access.
 The approach I used is as follows:
 - For each mesh triangle, dispatch `triangleSampleFactor` threads, each trying to produce a blade
@@ -79,17 +80,17 @@ about `triangleSampleFactor` blades, triangles with area 0.5 receive about half 
 [numthreads(64,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
-  if(id.x >= triangleCount * triangleSampleFactor) return;
-  uint triangleIndex = id.x / triangleSampleFactor;
-  uint bladeIndex = id.x % triangleSampleFactor;
-  int3 indexGroup = triangleBuffer[triangleIndex];
-  vertdata vertex0 = vertexBuffer[indexGroup.x];
-  vertdata vertex1 = vertexBuffer[indexGroup.y];
-  vertdata vertex2 = vertexBuffer[indexGroup.z];
+    if(id.x >= triangleCount * triangleSampleFactor) return;
+    uint triangleIndex = id.x / triangleSampleFactor;
+    uint bladeIndex = id.x % triangleSampleFactor;
+    int3 indexGroup = triangleBuffer[triangleIndex];
+    vertdata vertex0 = vertexBuffer[indexGroup.x];
+    vertdata vertex1 = vertexBuffer[indexGroup.y];
+    vertdata vertex2 = vertexBuffer[indexGroup.z];
       
-  float area = length(Normal(vertex0.vertex, vertex1.vertex, vertex2.vertex));
-  if(bladeIndex > round(area * triangleSampleFactor)) return;
-  ...
+    float area = length(Normal(vertex0.vertex, vertex1.vertex, vertex2.vertex));
+    if(bladeIndex > round(area * triangleSampleFactor)) return;
+    ...
 ```
 
 If a blade survives the position hash, we should generate some per blade properties before writing it out.
@@ -125,14 +126,75 @@ output buffer (meaning no empty space between instance data). The GPU expects th
 In this algorithm, you first mark instances as visible or not in a visibility buffer (1 meaning visible, 0 meaning not visible),
 then compute a prefix sum of that visibility buffer. The prefix sum values tell you where to write your instance data in the compacted buffer.
 
-![Visualization of scan-and-compact](/assets/grass/scan-and-compact.jpg)
+![Visualization of scan-and-compact](/assets/grass/scan-and-compact.jpg){: style="padding:15px;"}
 *Visualization of scan-and-compact*
 
 ## Scan
-First we do a scan pass, where we figure out which blades are visible.
-Since our grass data is in chunks, we should first scan over entire chunks, marking them visible or not.
+First I do a scan and compact over entire chunks.
+We'll allocate a buffer of `ChunkInfo` structs, which store bounds and visibility information for each chunk.
+```c#
+public struct ChunkInfo
+{
+    public int grassCount;
+    public int visible;
+    public int loaded;
+    public float4 boundsMin;
+    public float4 boundsMax;
+}
 
+GraphicsBuffer ChunkInfoBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, MaxGrassChunkCount, UnsafeUtility.SizeOf<ChunkInfo>());
+```
+This buffer is populated in a compute shader as the player moves in and out of different chunks. I have an append/consume buffer that stores 
+free indices into the ChunkInfoBuffer. When we want to populate a new chunk with grass, we just consume an index and write to the appropriate
+location.
 
+To determine if a chunk is visible, we compare it against the camera's 6 frustum planes:
+```c++
+bool AABBIsVisible(float3 min, float3 max)
+{
+    for(int i = 0; i < 6; i++)
+    {
+        float4 plane = planes[i];
+        float3 p = lerp(min.xyz, max.xyz, step(0.0, plane.xyz));
+        if(dot(plane.xyz, p) + plane.w < 0.0f) return false;
+    }
+
+    for (int axis = 0; axis < 3; axis++)
+    {
+        bool allAbove = true;
+        bool allBelow = true;
+
+        for(int i = 0; i < 8; i++)
+        {
+            float v = corners[i][axis];
+            allAbove &= (v > max[axis]);
+            allBelow &= (v < min[axis]);
+        }
+
+        if (allAbove || allBelow)
+            return false;
+    }
+    
+    return true;
+}
+``` 
+
+The first compute shader dispatch marks chunks as visible.
+Chunks that haven't had their grass blades calculated exit early.
+```cpp
+[numthreads(1024,1,1)]
+void ChunkVote (uint3 id : SV_DispatchThreadID)
+{
+    int chunkId = id.x;
+    ChunkInfo chunkInfo = chunkInformation[chunkId];
+    if(!chunkInfo.loaded) return;
+    chunkInformation[chunkId].visible = AABBIsVisible(chunkInfo.min.xyz, chunkInfo.max.xyz);
+}
+```
+
+Now that chunk visibility is determined, we do the prefix scan. To optimize it as much
+as possible, I used GPU Wave Intrinsics. If you are unfamiliar with the topic, I'd suggest
+reading </a href="https://flashypixels.wordpress.com/2018/11/10/intro-to-gpu-scalarization-part-1/">this great article.</a>
 
 Let's allocate a bit array, where the `Nth` bit signifies whether blade `N` is visible.
 We will represent this as a buffer of uints, each having 32 bits.

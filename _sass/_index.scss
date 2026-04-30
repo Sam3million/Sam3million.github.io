@@ -26,12 +26,52 @@
 }
 
 .post-list li {
-    display: block;
-    margin-bottom: 90px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 40px;
+    
+    // 1. Add the delineator line
+    // Use a light grey or a transparent version of your text color
+    border-bottom: 1px solid lighten($bright-green, 50%);
+    
+    // 2. Adjust spacing: 
+    // We split your original 90px margin into padding and margin 
+    // so the line is centered between the posts.
+    padding-bottom: 45px; 
+    margin-bottom: 45px;
 
+    // 3. Remove the line from the last post in the list
+    &:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    // 2. Allow the text group to take up the remaining space
+    .post-text-group {
+        flex: 1;
+    }
+
+    // 3. Define the size and behavior of the thumbnail
+    .project-thumbnail {
+        flex-shrink: 0; // Prevents the text from squishing the image
+        width: 350px; // Adjust this to make your thumbnail wider/narrower
+
+        img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 6px; // Optional: softly rounds the image corners
+            object-fit: cover; // Keeps the aspect ratio looking good
+        }
+    }
+
+    /* --- Keep your existing nested SCSS below this line --- */
+    
     .post-excerpt {
         @extend .post-content;
     }
+    
     .post-title {
         @extend .post-title;
         color: $bright-green;
@@ -59,8 +99,19 @@
 
         svg {
             fill: darken($link-color, 4%);
-            // fill: #132b00;
             vertical-align: middle;
+        }
+    }
+}
+
+// 4. Add a mobile media query so it doesn't get cramped on phones
+@media only screen and (max-width: 768px) {
+    .post-list li {
+        flex-direction: column; // Stacks the text and image vertically again
+        gap: 20px;
+
+        .project-thumbnail {
+            width: 100%; // Allows the image to fill the screen width on mobile
         }
     }
 }
