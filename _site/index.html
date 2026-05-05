@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <title>
+        
+            Sammy's Portfolio
+        
+    </title>
+    <meta name="description" content="Portfolio specializing in real-time rendering and shaders.">
+
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/assets/fonts/stylesheet.css">
+    <link rel="canonical" href="http://localhost:4000/">
+
+    <!--[if IE]><link rel="shortcut icon" href="/favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon-precomposed" href="/touch-icon-180px.png">
+    <link rel="icon" href="/favicon-196px.png">
+
+    <script type="text/javascript" src="/js/app.js"></script>
+</head>
+
+
+  <body lang="en">
+    <div id="all">
+      <div id="center-all">
+
+        <header id="site-header">
+  <div id="header-title">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
+    <div id="header-link">
+      <a href="/">Sammy's Portfolio</a>
+    </div>
+  </div>
+
+  <div id="header-desc">
+    <span id="header-desc-inner">🍂</span>
+  </div>
+  <div id="header-desc-border"></div>
+</header>
+
+
+        <div class="page-content">
+          <div class="wrapper">
+            <div class="home">
+
+  <div class="blog-desc">A blog about game development, computer graphics, engineering, and other stuff.</div>
+
+  <div class="index-sep"></div>
+  
+  <div id="filters" style="margin-bottom: 30px; text-align: center;">
+    <button class="filter-btn active" onclick="filterSelection('all')">All</button>
+    <button class="filter-btn" onclick="filterSelection('gamedev')">GameDev</button>
+    <button class="filter-btn" onclick="filterSelection('engineering')">Engineering</button>
+  </div>
+
+  <ul class="post-list">
+    
+      <li class="post-item engineering" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/engineering/2026/04/20/Monoball.html">Monoball</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>This was my team’s Senior Design project at UCF. Monoball is a single rotor, spherically enclosed,
+ducted camera drone meant for reconaissance and search-and-rescue operations. The team was composed
+of 4 Aerospace Engineering majors (including myself), and 2 Computer Engineering majors.</p>
+
+</div>
+          
+          <a class="continue-read" href="/engineering/2026/04/20/Monoball.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Apr 20, 2026</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/engineering/2026/04/20/Monoball.html">
+              <img src="/assets/monoball/monoball.jpg" alt="Monoball thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item gamedev" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/gamedev/2026/04/19/my-first-shader.html">GPU-driven Grass Rendering</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>In this post I describe the GPU-driven grass rendering technique I implemented for my ongoing survival game project.
+Grass blades are generated, culled, compacted, rendered, and animated all on the GPU using compute shaders and indirect instanced draw calls.
+The results look great, with immersive wind sway and realistic height, width, and bend variation.
+The performance is great too, with my M1 Macbook Pro (10 Core CPU, 16 Core GPU) achieving 144+ FPS at 1080p in a fully grass covered scene.
+Memory usage is relatively cheap, as I make use of bit arrays, indexing, and data packing. More on that later.</p>
+
+</div>
+          
+          <a class="continue-read" href="/gamedev/2026/04/19/my-first-shader.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Apr 19, 2026</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/gamedev/2026/04/19/my-first-shader.html">
+              <img src="/assets/grass/landscape.png" alt="GPU-driven Grass Rendering thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item gamedev" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/gamedev/2026/03/28/marching-cubes.html">Hyper Marching Cubes</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>This post describes my journey with the Marching Cubes algorithm. I also describe my variation on the algorithm, which I call “Hyper Marching Cubes”.
+This version allows for unique vertex output, faster triangulation, and faster per-vertex normal calculation. It doesn’t use any Dictionary/HashMap
+collections, making it well suited for both multithreaded CPU and compute shader GPU implementations. My CPU implementation is able to mesh a 32x32x32
+volume in around 0.2 ms without duplicate vertices and with angle-weighted per-vertex normals. This does come at the cost of some memory.</p>
+
+</div>
+          
+          <a class="continue-read" href="/gamedev/2026/03/28/marching-cubes.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Mar 28, 2026</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/gamedev/2026/03/28/marching-cubes.html">
+              <img src="/assets/aridsun/arid-sun-1.png" alt="Hyper Marching Cubes thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item gamedev" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/gamedev/2025/08/16/custom-render-pipeline.html">Custom Render Pipeline</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>I wrote a custom scriptable render pipeline in Unity, implementing deferred rendering,
+forward rendering, render passes, realtime lighting, shadow mapping, bloom, tone mapping,
+and more. Deferred rendering for many lights. Bloom implemented using compute shaders to
+leverage LDS, giving higher performance and quality than raster based bloom.</p>
+</div>
+          
+          <a class="continue-read" href="/gamedev/2025/08/16/custom-render-pipeline.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Aug 16, 2025</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/gamedev/2025/08/16/custom-render-pipeline.html">
+              <img src="/assets/aridsun/arid-sun-1.png" alt="Custom Render Pipeline thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item engineering" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/engineering/2024/04/28/divergence-meter.html">Divergence Meter</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>This post details my experience creating a replica divergence meter from the show Stein’s Gate.
+It uses 8 high voltage nixie tube digit displays and can display any number you wish.
+Most of the time it acts as a clock, but every so often significant world events can cause
+the world line to change…</p>
+
+</div>
+          
+          <a class="continue-read" href="/engineering/2024/04/28/divergence-meter.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Apr 28, 2024</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/engineering/2024/04/28/divergence-meter.html">
+              <img src="/assets/divmeter/divmeter.jpg" alt="Divergence Meter thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item gamedev" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/gamedev/2022/02/01/cpu-raytracer.html">CPU Raytracer</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>This was a project I would work on in my free time during my senior year of high school.
+I thought it would be fun to write a raytracer from scratch without relying too much on outside information.
+I wrote it in Java because that was what we were using in my AP CSA class. I watched a bunch of videos on linear algebra,
+and wrote a library based on my newly acquired knowledge (thank you 3Blue1Brown). I derived ray intersection
+functions for various shapes, implemented texturing, reflections, shadows, and skybox. It ran super slow of
+course, but it gave me a deep understanding of rendering fundamentals.</p>
+
+</div>
+          
+          <a class="continue-read" href="/gamedev/2022/02/01/cpu-raytracer.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Feb 1, 2022</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/gamedev/2022/02/01/cpu-raytracer.html">
+              <img src="/assets/cpu-raytracer/frame-output.png" alt="CPU Raytracer thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+      <li class="post-item gamedev" style="list-style: none;">
+        
+        <div class="post-text-group">
+          <h2>
+            <a class="post-title" href="/gamedev/2021/06/27/arid-sun.html">Arid Sun</a>
+          </h2>
+          
+          <div class="post-excerpt"><p>This was a laser-mirror puzzle game I made for the 2021 Technology Student Association video game design competition.
+Our team consisted of 6 members. I handled the Unity work and programming, and assisted with level design and story.
+Other members worked on level design, 3D modeling, UI, sounds, and story.
+This was the first project I worked on where everything seemed to click.
+It was here I learned how to effectively work in a team development environment. 
+We ended up winning 1st place in the Florida state conference and 2nd place nationally!
+Download it <a href="https://irivium.itch.io/arid-sun">here</a>!</p>
+
+</div>
+          
+          <a class="continue-read" href="/gamedev/2021/06/27/arid-sun.html">
+            Continue reading
+            <svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 8 8'>
+              <path d='M4 0c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-1 2l3 2-3 2v-4z' />
+            </svg>
+          </a>
+          <span class="post-meta">Jun 27, 2021</span>
+        </div>
+  
+        
+          <div class="project-thumbnail">
+            <a href="/gamedev/2021/06/27/arid-sun.html">
+              <img src="/assets/aridsun/arid-sun-1.png" alt="Arid Sun thumbnail">
+            </a>
+          </div>
+        
+  
+      </li>
+    
+  </ul>
+</div>
+
+<script>
+  function filterSelection(c) {
+    var x, i;
+    x = document.getElementsByClassName("post-item");
+    if (c == "all") c = "";
+    
+    for (i = 0; i < x.length; i++) {
+      x[i].style.display = "none";
+      // Check if the post has the category class
+      if (x[i].className.indexOf(c) > -1) {
+        x[i].style.display = "flex"; 
+      }
+    }
+    
+    // Update active button state
+    var btns = document.getElementsByClassName("filter-btn");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove("active");
+      // This matches the button based on the category string
+      if (btns[i].getAttribute('onclick').includes("'" + (c || 'all') + "'")) {
+        btns[i].classList.add("active");
+      }
+    }
+  }
+  
+  // --- NEW STUFF BELOW ---
+  
+  window.onload = function() {
+    // 1. Get the 'filter' parameter from the URL (e.g., ?filter=gamedev)
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterBy = urlParams.get('filter');
+  
+    // 2. If the parameter exists, filter by it. Otherwise, show 'all'.
+    if (filterBy) {
+      filterSelection(filterBy);
+    } else {
+      filterSelection('all');
+    }
+  };
+  </script>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer id="site-footer">
+  <div id="footer-content">
+    <div id="footer-right">
+      Blog developed <a href="https://github.com/Sam3million/Sam3million.github.io">on GitHub</a>
+    </div>
+    <div id="footer-left">
+      <a href="https://github.com/">
+        @
+      </a>
+    </div>
+  </div>
+</footer>
+
+  </body>
+
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <title>
+        
+            GPU-driven Grass Rendering · Sammy's Portfolio
+        
+    </title>
+    <meta name="description" content="Portfolio specializing in real-time rendering and shaders.">
+
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/assets/fonts/stylesheet.css">
+    <link rel="canonical" href="http://localhost:4000/gamedev/2026/04/19/my-first-shader.html">
+
+    <!--[if IE]><link rel="shortcut icon" href="/favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon-precomposed" href="/touch-icon-180px.png">
+    <link rel="icon" href="/favicon-196px.png">
+
+    <script type="text/javascript" src="/js/app.js"></script>
+</head>
+
+
+  <body lang="en">
+    <div id="all">
+      <div id="center-all">
+
+        <header id="site-header">
+  <div id="header-title">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
+    <div id="header-link">
+      <a href="/">Sammy's Portfolio</a>
+    </div>
+  </div>
+
+  <div id="header-desc">
+    <span id="header-desc-inner">🍂</span>
+  </div>
+  <div id="header-desc-border"></div>
+</header>
+
+
+        <div class="page-content">
+          <div class="wrapper">
+            <div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">GPU-driven Grass Rendering</h1>
+    <p class="post-meta">Apr 19, 2026</p>
+  </header>
+
+  <article class="post-content">
+    <p>In this post I describe the GPU-driven grass rendering technique I implemented for my ongoing survival game project.
+Grass blades are generated, culled, compacted, rendered, and animated all on the GPU using compute shaders and indirect instanced draw calls.
+The results look great, with immersive wind sway and realistic height, width, and bend variation.
+The performance is great too, with my M1 Macbook Pro (10 Core CPU, 16 Core GPU) achieving 144+ FPS at 1080p in a fully grass covered scene.
+Memory usage is relatively cheap, as I make use of bit arrays, indexing, and data packing. More on that later.</p>
+
+<video width="100%;" muted="" controls="" loop="" playsinline="">
+  <source src="/assets/grass/grass.mp4" type="video/mp4" />
+</video>
+
+<div class="tldr">
+  <h1 id="key-takeaways">🔑 Key takeaways</h1>
+  <ul>
+    <li>Grass blades are generated per terrain chunk in a compute shader.</li>
+    <li>4 types of culling (Chunk-Frustum, Blade-Frustum, Distance-Stochastic, and Occlusion) minimize the number of blades we need to render</li>
+    <li>GPU Scan-And-Compact algorithm with Wave Intrinsics is used to compactify the blades into an output buffer</li>
+    <li>Grass geometry generated in vertex shader with cubic bezier curve, animated with noise texture, and rendered indirectly.</li>
+    <li>144+ FPS at 1080p with ~100,000 blades (culled down from ~1,000,000)</li>
+    <li>Can be easily extended to include different models (e.g. flowers, bushes)</li>
+  </ul>
+</div>
+
+<p><br />
+<em>Context</em>:
+This was created as part of my ongoing open-world survival game project. Things like chunked grass blade buffer management were implemented but
+are not discussed in depth here.</p>
+
+<p><img src="/assets/grass/landscape.png" alt="My survival game project" />
+<em>My survival game project</em>
+<br /></p>
+
+<h1 id="introduction">Introduction</h1>
+
+<!-- For simplicity, for most of this article, I am talking about the sun as light source: parallel light rays and  -->
+<p>Grass rendering is hot topic in computer graphics. There are many different techniques, but the most widely used approach is
+alpha-masked quads. This gives decent and cheap results, but loses out on realistic blade deformation and wind sway.</p>
+
+<!--Put image of grass quad rendering here -->
+
+<p>Another technique is to individually render each blade. This allows for each blade to have real geometry and actually be there in the world.
+Games like Ghost of Tsushima go all in on this approach, and the results speak for themselves.</p>
+
+<!--Put image of GoT grass rendering here -->
+
+<p>So why don’t we see it more often in games? Well, unless it is implemented very carefully, the performance cost is massive.
+In this post I’m going to describe my (mostly careful) implementation of per-blade grass rendering.</p>
+
+<h1 id="main-idea">Main Idea</h1>
+<p>To render a field of grass that looks full enough, we need hundreds of thousands to millions of blades.
+We could place a million blade objects in our scene, press play, and call it a day, but that would cause most computers to explode.
+To make this even remotely possible, we need to use a technique known as GPU Instancing. This technique allows us to draw
+many copies of a mesh at different position offsets with a single draw call. This alone still isn’t enough to make it performant, though.
+To take it to the next level, we need Indirect Instancing. What sets indirect instancing apart is that the number of instances is not 
+known by the CPU when it makes the draw call. That information lives completely in buffers on the GPU. What makes this so powerful
+is that we can perform culling on the grass blades in a compute shader prior to drawing them. That way, we’re not wasting time drawing
+blades that aren’t even on screen. We can also do things like separate the blades into LODs to further increase performance.</p>
+
+<h1 id="blade-generation">Blade Generation</h1>
+<p>First off, we need to generate a buffer with grass blade positions. It should live on the GPU for later culling and rendering,
+so populating it with a compute shader seems fitting. We want our grass blades to be positioned exactly on top of the terrain, so 
+we’re going to need the terrain mesh data. We can bind each mesh’s vertex and index buffers to our compute shader for access.
+The approach I used is as follows:</p>
+<ul>
+  <li>For each mesh triangle, dispatch <code class="language-plaintext highlighter-rouge">triangleSampleFactor</code> threads, each trying to produce a blade</li>
+  <li>For every thread
+    <ul>
+      <li>Generate a random hash</li>
+      <li>Using that hash, generate random barycentric coordinates describing a position on the triangle</li>
+      <li>Create another hash from that position, and use it to generate a random float in the range 0-1</li>
+      <li>If the float is less than some predefined value, atomically write the blade to the buffer</li>
+    </ul>
+  </li>
+</ul>
+
+<p>I also added a weighting to the number of blades to spawn based on the area of the triangle, because tiny triangles would have 
+the same number of blades as large ones, causing a non-uniform distribution across the mesh. Triangles with area 1 receive
+about <code class="language-plaintext highlighter-rouge">triangleSampleFactor</code> blades, triangles with area 0.5 receive about half as many, and so on.</p>
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">numthreads</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span>
+<span class="kt">void</span> <span class="nf">CSMain</span> <span class="p">(</span><span class="n">uint3</span> <span class="n">id</span> <span class="o">:</span> <span class="n">SV_DispatchThreadID</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">id</span><span class="p">.</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="n">triangleCount</span> <span class="o">*</span> <span class="n">triangleSampleFactor</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+    <span class="n">uint</span> <span class="n">triangleIndex</span> <span class="o">=</span> <span class="n">id</span><span class="p">.</span><span class="n">x</span> <span class="o">/</span> <span class="n">triangleSampleFactor</span><span class="p">;</span>
+    <span class="n">uint</span> <span class="n">bladeIndex</span> <span class="o">=</span> <span class="n">id</span><span class="p">.</span><span class="n">x</span> <span class="o">%</span> <span class="n">triangleSampleFactor</span><span class="p">;</span>
+    <span class="n">int3</span> <span class="n">indexGroup</span> <span class="o">=</span> <span class="n">triangleBuffer</span><span class="p">[</span><span class="n">triangleIndex</span><span class="p">];</span>
+    <span class="n">vertdata</span> <span class="n">vertex0</span> <span class="o">=</span> <span class="n">vertexBuffer</span><span class="p">[</span><span class="n">indexGroup</span><span class="p">.</span><span class="n">x</span><span class="p">];</span>
+    <span class="n">vertdata</span> <span class="n">vertex1</span> <span class="o">=</span> <span class="n">vertexBuffer</span><span class="p">[</span><span class="n">indexGroup</span><span class="p">.</span><span class="n">y</span><span class="p">];</span>
+    <span class="n">vertdata</span> <span class="n">vertex2</span> <span class="o">=</span> <span class="n">vertexBuffer</span><span class="p">[</span><span class="n">indexGroup</span><span class="p">.</span><span class="n">z</span><span class="p">];</span>
+      
+    <span class="kt">float</span> <span class="n">area</span> <span class="o">=</span> <span class="n">length</span><span class="p">(</span><span class="n">Normal</span><span class="p">(</span><span class="n">vertex0</span><span class="p">.</span><span class="n">vertex</span><span class="p">,</span> <span class="n">vertex1</span><span class="p">.</span><span class="n">vertex</span><span class="p">,</span> <span class="n">vertex2</span><span class="p">.</span><span class="n">vertex</span><span class="p">));</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">bladeIndex</span> <span class="o">&gt;</span> <span class="n">round</span><span class="p">(</span><span class="n">area</span> <span class="o">*</span> <span class="n">triangleSampleFactor</span><span class="p">))</span> <span class="k">return</span><span class="p">;</span>
+    <span class="p">...</span>
+</code></pre></div></div>
+
+<p>If a blade survives the position hash, we should generate some per blade properties before writing it out.
+This includes things like height, width, bend, wind offset, and facing direction. I use a combination of
+hashing and simplex noise for these properties.</p>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// Generate random facing direction</span>
+<span class="n">float3</span> <span class="n">u</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">float3</span><span class="p">(</span><span class="n">normal</span><span class="p">.</span><span class="n">y</span><span class="p">,</span> <span class="o">-</span><span class="n">normal</span><span class="p">.</span><span class="n">x</span><span class="p">,</span> <span class="mi">0</span><span class="p">));</span>
+<span class="c1">// This should be a unit vector:</span>
+<span class="n">float3</span> <span class="n">v</span> <span class="o">=</span> <span class="n">cross</span><span class="p">(</span><span class="n">normal</span><span class="p">,</span> <span class="n">u</span><span class="p">);</span>
+<span class="kt">float</span> <span class="n">theta</span> <span class="o">=</span> <span class="n">Random</span><span class="p">(</span><span class="n">posSeed</span> <span class="o">^</span> <span class="mi">382173</span><span class="p">)</span> <span class="o">*</span> <span class="mf">2.0</span><span class="n">f</span> <span class="o">*</span> <span class="mf">3.141592653589793</span><span class="n">f</span><span class="p">;</span>
+<span class="c1">// This should also be a unit vector:</span>
+<span class="n">float3</span> <span class="n">grassDirection</span> <span class="o">=</span> <span class="n">cos</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="n">u</span> <span class="o">+</span> <span class="n">sin</span><span class="p">(</span><span class="n">theta</span><span class="p">)</span> <span class="o">*</span> <span class="n">v</span><span class="p">;</span>
+
+<span class="c1">// Generate random height and width</span>
+<span class="kt">float</span> <span class="n">height</span> <span class="o">=</span> <span class="n">max</span><span class="p">((</span><span class="n">SimplexNoise</span><span class="p">(</span><span class="n">pos</span> <span class="o">*</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">),</span> <span class="mf">0.25</span><span class="p">);</span>
+<span class="kt">float</span> <span class="n">width</span>  <span class="o">=</span> <span class="n">max</span><span class="p">(</span><span class="n">SimplexNoise</span><span class="p">(</span><span class="n">pos</span> <span class="o">*</span> <span class="mf">0.1</span> <span class="o">+</span> <span class="n">float3</span><span class="p">(</span><span class="o">-</span><span class="mf">602.4912</span><span class="p">,</span> <span class="o">-</span><span class="mf">998.21</span><span class="p">,</span> <span class="mf">412.145</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">);</span>
+<span class="kt">float</span> <span class="n">bend</span>   <span class="o">=</span> <span class="n">SimplexNoise</span><span class="p">(</span><span class="n">pos</span> <span class="o">*</span> <span class="mf">0.1</span> <span class="o">+</span> <span class="n">float3</span><span class="p">(</span><span class="mf">591.12</span><span class="p">,</span> <span class="o">-</span><span class="mf">123.44</span><span class="p">,</span> <span class="o">-</span><span class="mf">123.321</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">wind</span>   <span class="o">=</span> <span class="n">SimplexNoise</span><span class="p">(</span><span class="n">pos</span> <span class="o">*</span> <span class="mf">0.1</span> <span class="o">+</span> <span class="n">float3</span><span class="p">(</span><span class="mf">223.981</span><span class="p">,</span> <span class="o">-</span><span class="mf">111.95</span><span class="p">,</span> <span class="mf">223.45</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">;</span>
+
+<span class="n">GrassInfo</span> <span class="n">g</span><span class="p">;</span>
+  
+<span class="c1">// Store properties and write</span>
+<span class="p">...</span>
+</code></pre></div></div>
+
+<h1 id="culling">Culling</h1>
+<p>This is the most important stage and what makes rendering individual blades possible.
+We want to only render blades that are on screen. To do this, we’re going to use the scan-and-compact algorithm.
+The purpose of this algorithm is to determine which blades are visible, and then place those blades into a compact 
+output buffer (meaning no empty space between instance data). The GPU expects the instance data buffer to be compact, so this is necessary.
+In this algorithm, you first mark instances as visible or not in a visibility buffer (1 meaning visible, 0 meaning not visible),
+then compute a prefix sum of that visibility buffer. The prefix sum values tell you where to write your instance data in the compacted buffer.</p>
+
+<p><img src="/assets/grass/scan-and-compact.jpg" alt="Visualization of scan-and-compact" style="padding:15px;" />
+<em>Visualization of scan-and-compact</em></p>
+
+<h2 id="scan">Scan</h2>
+<p>First I do a scan and compact over entire chunks.
+We’ll allocate a buffer of <code class="language-plaintext highlighter-rouge">ChunkInfo</code> structs, which store bounds and visibility information for each chunk.</p>
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">struct</span> <span class="nc">ChunkInfo</span>
+<span class="p">{</span>
+    <span class="k">public</span> <span class="kt">int</span> <span class="n">grassCount</span><span class="p">;</span>
+    <span class="k">public</span> <span class="kt">int</span> <span class="n">visible</span><span class="p">;</span>
+    <span class="k">public</span> <span class="kt">int</span> <span class="n">loaded</span><span class="p">;</span>
+    <span class="k">public</span> <span class="n">float4</span> <span class="n">boundsMin</span><span class="p">;</span>
+    <span class="k">public</span> <span class="n">float4</span> <span class="n">boundsMax</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">GraphicsBuffer</span> <span class="n">ChunkInfoBuffer</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">GraphicsBuffer</span><span class="p">(</span><span class="n">GraphicsBuffer</span><span class="p">.</span><span class="n">Target</span><span class="p">.</span><span class="n">Structured</span><span class="p">,</span> <span class="n">MaxGrassChunkCount</span><span class="p">,</span> <span class="n">UnsafeUtility</span><span class="p">.</span><span class="n">SizeOf</span><span class="p">&lt;</span><span class="n">ChunkInfo</span><span class="p">&gt;());</span>
+</code></pre></div></div>
+<p>This buffer is populated in a compute shader as the player moves in and out of different chunks. I have an append/consume buffer that stores 
+free indices into the ChunkInfoBuffer. When we want to populate a new chunk with grass, we just consume an index and write to the appropriate
+location.</p>
+
+<p>To determine if a chunk is visible, we compare it against the camera’s 6 frustum planes:</p>
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">bool</span> <span class="nf">AABBIsVisible</span><span class="p">(</span><span class="n">float3</span> <span class="n">min</span><span class="p">,</span> <span class="n">float3</span> <span class="n">max</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">6</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">float4</span> <span class="n">plane</span> <span class="o">=</span> <span class="n">planes</span><span class="p">[</span><span class="n">i</span><span class="p">];</span>
+        <span class="n">float3</span> <span class="n">p</span> <span class="o">=</span> <span class="n">lerp</span><span class="p">(</span><span class="n">min</span><span class="p">.</span><span class="n">xyz</span><span class="p">,</span> <span class="n">max</span><span class="p">.</span><span class="n">xyz</span><span class="p">,</span> <span class="n">step</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">plane</span><span class="p">.</span><span class="n">xyz</span><span class="p">));</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">dot</span><span class="p">(</span><span class="n">plane</span><span class="p">.</span><span class="n">xyz</span><span class="p">,</span> <span class="n">p</span><span class="p">)</span> <span class="o">+</span> <span class="n">plane</span><span class="p">.</span><span class="n">w</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">)</span> <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+    <span class="p">}</span>
+
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">axis</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">axis</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">;</span> <span class="n">axis</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="kt">bool</span> <span class="n">allAbove</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+        <span class="kt">bool</span> <span class="n">allBelow</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+
+        <span class="k">for</span><span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="kt">float</span> <span class="n">v</span> <span class="o">=</span> <span class="n">corners</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">axis</span><span class="p">];</span>
+            <span class="n">allAbove</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="n">v</span> <span class="o">&gt;</span> <span class="n">max</span><span class="p">[</span><span class="n">axis</span><span class="p">]);</span>
+            <span class="n">allBelow</span> <span class="o">&amp;=</span> <span class="p">(</span><span class="n">v</span> <span class="o">&lt;</span> <span class="n">min</span><span class="p">[</span><span class="n">axis</span><span class="p">]);</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">allAbove</span> <span class="o">||</span> <span class="n">allBelow</span><span class="p">)</span>
+            <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>The first compute shader dispatch marks chunks as visible.
+Chunks that haven’t had their grass blades calculated exit early.</p>
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">numthreads</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span>
+<span class="kt">void</span> <span class="nf">ChunkVote</span> <span class="p">(</span><span class="n">uint3</span> <span class="n">id</span> <span class="o">:</span> <span class="n">SV_DispatchThreadID</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">int</span> <span class="n">chunkId</span> <span class="o">=</span> <span class="n">id</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+    <span class="n">ChunkInfo</span> <span class="n">chunkInfo</span> <span class="o">=</span> <span class="n">chunkInformation</span><span class="p">[</span><span class="n">chunkId</span><span class="p">];</span>
+    <span class="k">if</span><span class="p">(</span><span class="o">!</span><span class="n">chunkInfo</span><span class="p">.</span><span class="n">loaded</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+    <span class="n">chunkInformation</span><span class="p">[</span><span class="n">chunkId</span><span class="p">].</span><span class="n">visible</span> <span class="o">=</span> <span class="n">AABBIsVisible</span><span class="p">(</span><span class="n">chunkInfo</span><span class="p">.</span><span class="n">min</span><span class="p">.</span><span class="n">xyz</span><span class="p">,</span> <span class="n">chunkInfo</span><span class="p">.</span><span class="n">max</span><span class="p">.</span><span class="n">xyz</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now that chunk visibility is determined, we do the prefix scan. To optimize it as much
+as possible, I used GPU Wave Intrinsics. If you are unfamiliar with the topic, I’d suggest
+reading &lt;/a href=”https://flashypixels.wordpress.com/2018/11/10/intro-to-gpu-scalarization-part-1/”&gt;this great article.&lt;/a&gt;</p>
+
+<p>Let’s allocate a bit array, where the <code class="language-plaintext highlighter-rouge">Nth</code> bit signifies whether blade <code class="language-plaintext highlighter-rouge">N</code> is visible.
+We will represent this as a buffer of uints, each having 32 bits.</p>
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">GraphicsBuffer</span> <span class="n">BladeInfoBuffer</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">GraphicsBuffer</span><span class="p">(</span><span class="n">GraphicsBuffer</span><span class="p">.</span><span class="n">Target</span><span class="p">.</span><span class="n">Structured</span><span class="p">,</span> <span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">math</span><span class="p">.</span><span class="nf">ceil</span><span class="p">(</span><span class="n">maxGrassCountPerChunk</span> <span class="p">*</span> <span class="n">MaxChunkCount</span> <span class="p">/</span> <span class="m">32f</span><span class="p">),</span> <span class="m">4</span><span class="p">);</span>
+</code></pre></div></div>
+
+  </article>
+  <img src="/img/bottom.png" class="post-bottom"/>
+
+  <!-- <h2 style="margin-bottom: 20px;">Comments</h2>
+  <div class="comments-container" id="comments-container">
+    <div class="comments-gradient" id="comments-gradient">
+      <button id="show-all-button">Show all comments</button>
+    </div>
+    <script src="https://utteranc.es/client.js"
+            repo="LukasKalbertodt/LukasKalbertodt.github.io"
+            issue-term="pathname"
+            crossorigin="anonymous"
+            async>
+    </script>
+  </div> -->
+</div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer id="site-footer">
+  <div id="footer-content">
+    <div id="footer-right">
+      Blog developed <a href="https://github.com/Sam3million/Sam3million.github.io">on GitHub</a>
+    </div>
+    <div id="footer-left">
+      <a href="https://github.com/">
+        @
+      </a>
+    </div>
+  </div>
+</footer>
+
+  </body>
+
+</html>

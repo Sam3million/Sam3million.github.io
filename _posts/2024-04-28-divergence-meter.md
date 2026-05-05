@@ -3,6 +3,7 @@ layout: post
 title: "Divergence Meter"
 date: 2024-04-28
 thumbnail: "/assets/divmeter/divmeter.jpg"
+category: engineering
 ---
 
 This post details my experience creating a replica divergence meter from the show Stein's Gate.

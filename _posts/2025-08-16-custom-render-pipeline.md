@@ -3,6 +3,7 @@ layout: post
 title: "Custom Render Pipeline"
 date: 2025-08-16
 thumbnail: "/assets/aridsun/arid-sun-1.png"
+category: gamedev
 ---
 
 I wrote a custom scriptable render pipeline in Unity, implementing deferred rendering,

@@ -115,3 +115,24 @@
         }
     }
 }
+
+.filter-btn {
+    background: none;
+    border: 1px solid #ccc;
+    padding: 8px 16px;
+    margin: 0 5px;
+    cursor: pointer;
+    border-radius: 20px;
+    font-size: 0.9em;
+    transition: 0.2s;
+  }
+  
+  .filter-btn.active {
+    background-color: #367700; /* Your green */
+    color: white;
+    border-color: #367700;
+  }
+  
+  .filter-btn:hover:not(.active) {
+    background-color: #f0f0f0;
+  }

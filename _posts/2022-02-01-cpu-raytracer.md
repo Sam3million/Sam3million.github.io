@@ -3,6 +3,7 @@ layout: post
 title: "CPU Raytracer"
 date: 2022-02-01
 thumbnail: "/assets/cpu-raytracer/frame-output.png"
+category: gamedev
 ---
 
 This was a project I would work on in my free time during my senior year of high school.

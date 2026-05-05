@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <title>
+        
+            Divergence Meter · Sammy's Portfolio
+        
+    </title>
+    <meta name="description" content="Portfolio specializing in real-time rendering and shaders.">
+
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/assets/fonts/stylesheet.css">
+    <link rel="canonical" href="http://localhost:4000/engineering/2024/04/28/divergence-meter.html">
+
+    <!--[if IE]><link rel="shortcut icon" href="/favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon-precomposed" href="/touch-icon-180px.png">
+    <link rel="icon" href="/favicon-196px.png">
+
+    <script type="text/javascript" src="/js/app.js"></script>
+</head>
+
+
+  <body lang="en">
+    <div id="all">
+      <div id="center-all">
+
+        <header id="site-header">
+  <div id="header-title">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
+    <div id="header-link">
+      <a href="/">Sammy's Portfolio</a>
+    </div>
+  </div>
+
+  <div id="header-desc">
+    <span id="header-desc-inner">🍂</span>
+  </div>
+  <div id="header-desc-border"></div>
+</header>
+
+
+        <div class="page-content">
+          <div class="wrapper">
+            <div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">Divergence Meter</h1>
+    <p class="post-meta">Apr 28, 2024</p>
+  </header>
+
+  <article class="post-content">
+    <p>This post details my experience creating a replica divergence meter from the show Stein’s Gate.
+It uses 8 high voltage nixie tube digit displays and can display any number you wish.
+Most of the time it acts as a clock, but every so often significant world events can cause
+the world line to change…</p>
+
+<p><img src="/assets/divmeter/divmeter.jpg" alt="Divergence Meter" />
+<em>Divergence Meter</em></p>
+
+<h1 id="background">Background</h1>
+<p>The Divergence Meter is a device brought back from the future which measures the current world
+line’s divergence from the one in which it was first built. Those with the Reading Steiner ability
+can use it to determine if their actions have caused a change in the world line.</p>
+
+<p>… At least that’s how it goes in the show.</p>
+
+<p>You might be wondering what compelled me to undertake this project. In short: Nixie tubes look
+awesome. There’s something about the amber glow that just can’t be captured with 7 segment displays.
+I had watched Stein’s Gate a few years ago, and then I randomly got recommended a <a href="https://www.youtube.com/watch?v=ncqDI6mUXd4">video by Tom Titor on youtube</a>
+where he built a replica Divergence Meter. I thought the project would provide good experience with PCB design,
+embedded coding, and product manufacturing, so I went ahead and started planning. I followed <a href="http://www.brotoro.com/dm/index.html">Tom Titor’s
+website</a> as a guideline for the circuits and exterior, but designed the PCBs on my own and
+coded the software completely from scratch in C.</p>
+
+<h1 id="parts">Parts</h1>
+<p>The choice of Nixie Tube was surprisingly complex. There are many different variations
+that each have benefits and tradeoffs. The most important things to me were:</p>
+<ul>
+  <li>That it had a dedicated 5 digit (some use an upside down 2)</li>
+  <li>That it had a dedicated decimal point digit</li>
+  <li>That it could reasonably be acquired (some are very difficult to find)</li>
+</ul>
+
+<p>This narrowed down my choice to the IN-8-2 tube. This Soviet-era tube was manufactured
+from the 1970s to the 1990s, being used in measuring equipment. New old stock can still
+be found, and I was able to acquire 8 for $120 on Etsy.</p>
+
+<div style="display: flex; gap: 10px; align-items: flex-start;">
+  <div style="flex: 1;">
+    <div style="height: 500px; overflow: hidden; border-radius: 8px; background-color: transparent; -webkit-mask-image: -webkit-radial-gradient(white, black);">
+      <img src="/assets/divmeter/IN-14.jpg" alt="IN-14" style="width: 100%; height: 101%; object-fit: cover; object-position: center; display: block; margin: 0;" />
+    </div>
+    <span style="display: block; text-align: center; font-size: 0.85em; margin-top: 8px;">
+      IN-14 Nixie Tube With Upside-Down 2
+    </span>
+  </div>
+
+  <div style="flex: 1;">
+    <div style="height: 500px; overflow: hidden; border-radius: 8px; background-color: transparent; -webkit-mask-image: -webkit-radial-gradient(white, black);">
+      <img src="/assets/divmeter/IN-8-2.jpg" alt="IN-8-2" style="width: 100%; height: 101%; object-fit: cover; object-position: center; display: block; margin: 0;" />
+    </div>
+    <span style="display: block; text-align: center; font-size: 0.85em; margin-top: 8px;">
+      IN-8-2 Nixie Tube With Proper 5
+    </span>
+  </div>
+</div>
+
+<h2 id="component-breakdown">Component Breakdown</h2>
+<h4 id="electronics">Electronics</h4>
+<ul>
+  <li>8 IN-8-2 Nixie Tubes</li>
+  <li>Custom Logic PCB</li>
+  <li>Custom Nixie PCB</li>
+  <li>PIC16F628A Microcontroller</li>
+  <li>DS3232SN# Real Time Clock Chip</li>
+  <li>Coin Cell Battery Connector</li>
+  <li>Coin Cell Battery (for RTC)</li>
+  <li>3 HV Serial to Parallel Converters</li>
+  <li>1364 HVPS Horizontal (High Voltage)</li>
+  <li>2 Control Buttons</li>
+  <li>On-Off Switch</li>
+  <li>Plastic Switched Power Jack</li>
+  <li>Connector Pins (Male &amp; Female)</li>
+  <li>Trimpot for HVPS</li>
+  <li>Fuse</li>
+  <li>Various Resistors</li>
+  <li>Various Capacitors</li>
+</ul>
+
+<h4 id="exterior-shell">Exterior Shell</h4>
+<ul>
+  <li>Perfboard</li>
+  <li>Aluminum Sheets</li>
+  <li>Long Hex Nuts</li>
+  <li>Hex Screws</li>
+  <li>Normal Screws</li>
+  <li>Decorative Plastic Corner Covers</li>
+  <li>Nixie Tube End Caps</li>
+  <li>Decorative Electronic Components
+    <ul>
+      <li>Capacitors</li>
+      <li>Resistors</li>
+      <li>PDIP Chip</li>
+    </ul>
+  </li>
+</ul>
+
+<h1 id="exterior-design">Exterior Design</h1>
+
+<p>First I cut the aluminum sheets and perfboard to size. I used a ruler and a sharp utility knife
+for both, scoring until I could snap them.</p>
+
+<p><img src="/assets/divmeter/exterior-parts.jpg" alt="Exterior Parts" />
+<em>Exterior Parts Cut Out</em></p>
+
+<p>Next I drilled holes in the perfboard for the nixie tubes to slot in. My first attempt (pictured on bottom)
+wasn’t great, so I redid it.</p>
+
+<p><img src="/assets/divmeter/perfboard-cuts.jpg" alt="Drilled Perfboard" />
+<em>Drilled Perfboard</em></p>
+
+<p>I drilled holes in the back aluminum panel for the two control buttons, power jack, and power switch.
+To achieve a rectangular hole for the power switch, I first drilled some smaller circular holes, then
+filed the edges down to a rectangle.</p>
+
+<p><img src="/assets/divmeter/buttons.jpg" alt="Back Buttons" />
+<em>Installed Buttons</em></p>
+
+<p>I taped together the panels to hold them steady. Then, I applied epoxy to the inner corners to join them.
+The long hex nuts were also epoxied to the inner corners, allowing the top perfboard panel to be securely screwed
+in to the rest of the body.</p>
+
+<p><img src="/assets/divmeter/partially-assembled-exterior.jpg" alt="Back Buttons" />
+<em>Partially Assembled Exterior</em></p>
+
+<p>I modeled and 3D printed some end caps for the nixie tubes so they would sit flat.
+I also glued dummy electronic components to the perfboard, matching the show’s design.</p>
+
+<p><img src="/assets/divmeter/decorative-electronics.jpg" alt="Decorative Electronic Components" />
+<em>Decorative Electronic Components</em></p>
+
+<p>Finally, I glued plastic corners to the outer edges and screwed on the bottom perfboard and plastic panels.</p>
+
+<p><img src="/assets/divmeter/finished-exterior.jpg" alt="Finished Exterior" />
+<em>Finished Exterior</em></p>
+
+<h1 id="electronics-1">Electronics</h1>
+
+<p>I designed two PCBS: a Logic Board, containing the microcontroller, RTC chip, HV power supply,
+and associated parts, and a Nixie Board, containing HV serial to parallel converters, pulldown
+resistors, and solder points for the tubes. The two boards are connected with 8 pins that transfer
+ground, HV, and data.</p>
+
+<p><img src="/assets/divmeter/div-logic-board.jpg" alt="Logic Board" />
+<em>Logic Board</em></p>
+
+<p><img src="/assets/divmeter/div-nixie-board.jpg" alt="Divergence Meter" />
+<em>Nixie Board</em></p>
+
+<p>After soldering everything together and connecting the boards, it was time to write some software!</p>
+
+<h1 id="software">Software</h1>
+
+<p>I used MPLAB IDE X to write the software in C and compile it down to hex.
+I then flashed it onto the PIC with my Arduino UNO and a command line tool called <a href="https://github.com/battlecoder/zeppp">ZEPPP</a>.
+The PIC16F628A only has 2048 bytes of program memory, so I had to be very intentional with my coding.
+The first step was getting digits to display on the tubes.</p>
+
+<p>The way I decided to implement tube control was having a <code class="language-plaintext highlighter-rouge">digits</code> buffer, which stores the 0-9 value to display for
+each digit (plus 10 signifying decimal and 11 signifying off).
+The <code class="language-plaintext highlighter-rouge">bits</code> buffer stores the final bits we are going to write to the serial to parallel converters.</p>
+
+<p>Due to the way I designed the connections from the tubes to the serial to parallel converters in the PCB,
+I had to do some bit shuffling to get the serial output in the correct order. This seemed unavoidable
+if I wanted nice PCB wiring. I originally hardcoded a series of conditionals to produce the correct mapping,
+but I managed to figure out a more compact formula, which saved program space at the cost of a little working data space.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">char</span> <span class="n">bits</span><span class="p">[</span><span class="mi">12</span><span class="p">];</span>
+<span class="kt">char</span> <span class="n">digits</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span>
+<span class="kt">char</span> <span class="n">tubeBitIndices</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span> <span class="p">};</span>
+<span class="kt">char</span> <span class="n">tubeBitOffsets</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">2</span> <span class="p">};</span>
+
+<span class="c1">// This function converts the desired digits to the correct bit output</span>
+<span class="kt">void</span> <span class="nf">GetTubeBits</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="c1">// If tube digit 1 is to be set to 1, the bits for that would be 00000000010</span>
+    <span class="c1">// Each Tube has 10 bits corresponding to it and 1 extra NC bit (always zero)</span>
+    <span class="c1">// 11 * 8 = 88 bits + 8 = 96</span>
+    <span class="c1">// Tube 3 corresponds to indices 0 to 10 (from the end)</span>
+    <span class="c1">// Tube 2 corresponds to indices 11 to 21 (from the end)</span>
+    <span class="c1">// Tube 1 corresponds to indices 22 to 31 (from the end)</span>
+    <span class="c1">// Tube 6 corresponds to indices 32 to 42 (from the end)</span>
+    <span class="c1">// Tube 5 corresponds to indices 43 to 53(from the end)</span>
+    <span class="c1">// Tube 4 corresponds to indices 54 to 63 (from the end)</span>
+    <span class="c1">// Tube 8 corresponds to indices 64 to 74 (from the end)</span>
+    <span class="c1">// Tube 7 corresponds to indices 75 to 85 (from the end)</span>
+    <span class="c1">// Decimals correspond to indices 86 to 95 (from the end)</span>
+    
+    <span class="c1">// 0 8 16 24 32 40 48 56 64 72 80 88 96</span>
+    <span class="kt">int</span> <span class="n">temp</span><span class="p">;</span>
+    <span class="kt">int</span> <span class="n">mask</span><span class="p">;</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">char</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">digits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="mi">0</span><span class="n">b1111111111111111</span> <span class="o">&gt;&gt;</span> <span class="p">(</span><span class="mi">16</span> <span class="o">-</span> <span class="n">tubeBitOffsets</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+            <span class="n">temp</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">((</span><span class="n">digits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">9</span><span class="p">)</span> <span class="o">%</span> <span class="mi">10</span><span class="p">);</span>
+            <span class="n">bits</span><span class="p">[</span><span class="n">tubeBitIndices</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">|=</span> <span class="p">(</span><span class="kt">char</span><span class="p">)</span> <span class="p">((</span><span class="n">temp</span> <span class="o">&amp;</span> <span class="n">mask</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="mi">8</span> <span class="o">-</span> <span class="n">tubeBitOffsets</span><span class="p">[</span><span class="n">i</span><span class="p">]));</span>
+            <span class="n">bits</span><span class="p">[</span><span class="n">tubeBitIndices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="kt">char</span><span class="p">)</span> <span class="p">((</span><span class="n">temp</span> <span class="o">&amp;</span> <span class="p">(</span><span class="o">~</span><span class="n">mask</span> <span class="o">&amp;</span> <span class="mi">0</span><span class="n">b0000001111111111</span><span class="p">))</span> <span class="o">&gt;&gt;</span> <span class="n">tubeBitOffsets</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+        <span class="p">}</span>
+        <span class="k">else</span> <span class="k">if</span><span class="p">(</span><span class="n">digitsFinal</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">bits</span><span class="p">[</span><span class="n">i</span> <span class="o">/</span> <span class="mi">6</span><span class="p">]</span> <span class="o">|=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">((</span><span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">%</span> <span class="mi">8</span><span class="p">));</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Now all I have to do is populate the digits buffer with the digits I want displayed,
+and call the DisplayDigits function, which will write the correct bits to the serial to parallel
+converters and finally light the correct tube digits.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">DisplayDigits</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">char</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">12</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="n">bits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+
+    <span class="n">GetTubeBits</span><span class="p">();</span>
+
+    <span class="c1">// Clock pin:</span>
+    <span class="n">RB1</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="k">for</span><span class="p">(</span><span class="kt">char</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">12</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="c1">// Send bits:</span>
+        <span class="k">for</span><span class="p">(</span><span class="kt">char</span> <span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span>
+        <span class="p">{</span>
+            <span class="n">RA3</span> <span class="o">=</span> <span class="p">(</span><span class="n">bits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&amp;</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">j</span><span class="p">))</span> <span class="o">&gt;&gt;</span> <span class="n">j</span><span class="p">;</span>
+            <span class="n">RB1</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+            <span class="n">RB1</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="c1">// Unlatch:</span>
+    <span class="n">RA0</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="n">RA0</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><img src="/assets/divmeter/first-test.jpg" alt="First Test" />
+<em>Testing the Tubes</em></p>
+
+<h2 id="connecting-to-the-rtc-chip">Connecting to the RTC Chip</h2>
+
+<p>Since we want to be able to use this as a clock, we need to connect to the RTC chip to read the current time.
+The DS3232SN# uses the I2C communication protocol for serial data transfer.
+After writing some boiler plate code and referencing the datasheet, we can successfully connect to the RTC!
+Reading the time is as simple as sending the correct register address to the chip.</p>
+
+<p><img src="/assets/divmeter/address-map.png" alt="First Test" />
+<em>DS3232 Address Map</em></p>
+
+<p>We can now read the time!</p>
+
+<video width="100%" autoplay="" muted="" loop="" playsinline="">
+    <source src="/assets/divmeter/divclock.mp4" type="video/mp4" />
+</video>
+
+<p>We can set the time by writing to the registers instead of reading.
+Notice that addresses 14h-0FFh are listed as SRAM. This is general purpose, battery backed memory we can use 
+to store persistent data. Right now I have it store the current worldline and its expiration date.</p>
+
+<p>The rest of the coding process was adding features like button interaction, menus, visual effects, and SRAM debug read/write.</p>
+
+<h1 id="finished-product">Finished Product</h1>
+
+<p>Here are some shots of the finished product.</p>
+
+<p><img src="/assets/divmeter/finished-clock.jpg" alt="finished-clock" /></p>
+
+<p><img src="/assets/divmeter/finished-clock-2.jpg" alt="finished-clock" /></p>
+
+<video width="100%" muted="" controls="" loop="" playsinline="">
+    <source src="/assets/divmeter/day-clock.mp4" type="video/mp4" />
+</video>
+
+<video width="100%" muted="" controls="" loop="" playsinline="">
+    <source src="/assets/divmeter/night-clock.mp4" type="video/mp4" />
+</video>
+
+<video width="100%" muted="" controls="" loop="" playsinline="">
+    <source src="/assets/divmeter/scramble-effect.mp4" type="video/mp4" />
+</video>
+
+<h1 id="final-thoughts">Final Thoughts</h1>
+
+<p>This was a super fun project and I definitely learned a lot. The clock works perfectly and has not lost so much as a second
+after a year of operation. I have it so that every day at midnight, a new world line number is generated. This is then 
+displayed at random times throughout the day. Some software features I still want to implement include an anti-poisoning
+routine for the tubes, more effects, dimming, and a date display. If I were to design it from scratch again, I would try
+to condense the internals even more to make room for a rechargeable battery. Maybe I’ll revisit it in a different world line…</p>
+
+  </article>
+  <img src="/img/bottom.png" class="post-bottom"/>
+
+  <!-- <h2 style="margin-bottom: 20px;">Comments</h2>
+  <div class="comments-container" id="comments-container">
+    <div class="comments-gradient" id="comments-gradient">
+      <button id="show-all-button">Show all comments</button>
+    </div>
+    <script src="https://utteranc.es/client.js"
+            repo="LukasKalbertodt/LukasKalbertodt.github.io"
+            issue-term="pathname"
+            crossorigin="anonymous"
+            async>
+    </script>
+  </div> -->
+</div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer id="site-footer">
+  <div id="footer-content">
+    <div id="footer-right">
+      Blog developed <a href="https://github.com/Sam3million/Sam3million.github.io">on GitHub</a>
+    </div>
+    <div id="footer-left">
+      <a href="https://github.com/">
+        @
+      </a>
+    </div>
+  </div>
+</footer>
+
+  </body>
+
+</html>

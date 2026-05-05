@@ -3,6 +3,7 @@ layout: post
 title: "GPU-driven Grass Rendering"
 date: 2026-04-19
 thumbnail: "/assets/grass/landscape.png"
+category: gamedev
 ---
 
 In this post I describe the GPU-driven grass rendering technique I implemented for my ongoing survival game project.

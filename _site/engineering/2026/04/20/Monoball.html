@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <title>
+        
+            Monoball · Sammy's Portfolio
+        
+    </title>
+    <meta name="description" content="Portfolio specializing in real-time rendering and shaders.">
+
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/assets/fonts/stylesheet.css">
+    <link rel="canonical" href="http://localhost:4000/engineering/2026/04/20/Monoball.html">
+
+    <!--[if IE]><link rel="shortcut icon" href="/favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon-precomposed" href="/touch-icon-180px.png">
+    <link rel="icon" href="/favicon-196px.png">
+
+    <script type="text/javascript" src="/js/app.js"></script>
+</head>
+
+
+  <body lang="en">
+    <div id="all">
+      <div id="center-all">
+
+        <header id="site-header">
+  <div id="header-title">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
+    <div id="header-link">
+      <a href="/">Sammy's Portfolio</a>
+    </div>
+  </div>
+
+  <div id="header-desc">
+    <span id="header-desc-inner">🍂</span>
+  </div>
+  <div id="header-desc-border"></div>
+</header>
+
+
+        <div class="page-content">
+          <div class="wrapper">
+            <div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">Monoball</h1>
+    <p class="post-meta">Apr 20, 2026</p>
+  </header>
+
+  <article class="post-content">
+    <p>This was my team’s Senior Design project at UCF. Monoball is a single rotor, spherically enclosed,
+ducted camera drone meant for reconaissance and search-and-rescue operations. The team was composed
+of 4 Aerospace Engineering majors (including myself), and 2 Computer Engineering majors.</p>
+
+<p><img src="/assets/monoball/monoball.jpg" alt="Monoball" />
+<em>Monoball</em></p>
+
+<p><img src="/assets/monoball/flight-test-pic-1.png" alt="Monoball Without Its Outer Shell" />
+<em>Monoball Without Its Outer Shell</em></p>
+
+<h1 id="background">Background</h1>
+
+<p>The Monoball project began in Fall 2025 as a UCF Senior Design project sponsored by Lockheed Martin.
+I applied for it as my top pick and was selected to be a part of the team.</p>
+
+<p>The project was pitched as a reconaissance and search-and-rescue drone. The main use case is
+entering environments where it would be dangerous for humans to go. For example, a collapsed building
+or wildfire. The protective outer shell will allow the drone to bump into walls and obstacles
+in these environments. It will transmit a live video feed back to the operator so they can
+navigate and explore. The sponsor also requested that it have a rolling mode, where
+the drone could roll on the ground instead of flying. This theoretically saves battery life
+and allows for traversal in height-constrained environments.</p>
+
+<h1 id="requirements">Requirements</h1>
+
+<p>The team met with the sponsor to generate a list of requirements. Some of those included:</p>
+<ul>
+  <li>30 minute flight time</li>
+  <li>Beach ball sized or smaller</li>
+  <li>Roll mode</li>
+  <li>High quality camera feed</li>
+  <li>Ducted propeller</li>
+  <li>GPS</li>
+</ul>
+
+<h1 id="design">Design</h1>
+
+<p>We each conducted technology studies into different areas to gain an understanding of what
+the project would entail. I looked into drone computing hardware, including things
+like flight controllers, sensors, and RF transmitters. My teammates looked into
+topics such as propulsion, theory, software, and existing solutions.</p>
+
+<p>From this, we came up with initial design concepts. The initial idea
+was essentially a block of PLA where the internals would be mounted,
+surrounded by a geodesic outer shell. The drone is lifted by a
+single upwards facing propeller and moves with 4 control surfaces
+mounted near the bottom.</p>
+
+<p><img src="/assets/monoball/initial-design.png" alt="Initial Design" />
+<em>Initial Design</em></p>
+
+<p>The main issues with this design were weight and mounting space.
+The thick PLA construction of the internal components and the outer shell 
+would have been too heavy for a single motor to lift. There also wasn’t enough mounting space
+for all the internal components</p>
+
+<h2 id="revision-2">Revision 2</h2>
+
+<p>Inspired by a research paper that built a similar monocopter drone, the team did a redesign
+prioritizing weight. The new design uses modular plates that can be mounted on a series
+of carbon fiber tubes. Small flanges and walls were later added to the top plate to provide more
+mounting area.</p>
+
+<p><img src="/assets/monoball/new-design.png" alt="New Design" />
+<em>New Design</em></p>
+
+<p><img src="/assets/monoball/revised-plates.png" alt="Revised Plates" />
+<em>Revised Plate Designs</em></p>
+
+<h1 id="the-flight-test">The Flight* Test</h1>
+
+<video width="100%;" muted="" controls="" loop="" playsinline="">
+  <source src="/assets/monoball/flight-test-2.mp4" type="video/mp4" />
+</video>
+
+  </article>
+  <img src="/img/bottom.png" class="post-bottom"/>
+
+  <!-- <h2 style="margin-bottom: 20px;">Comments</h2>
+  <div class="comments-container" id="comments-container">
+    <div class="comments-gradient" id="comments-gradient">
+      <button id="show-all-button">Show all comments</button>
+    </div>
+    <script src="https://utteranc.es/client.js"
+            repo="LukasKalbertodt/LukasKalbertodt.github.io"
+            issue-term="pathname"
+            crossorigin="anonymous"
+            async>
+    </script>
+  </div> -->
+</div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer id="site-footer">
+  <div id="footer-content">
+    <div id="footer-right">
+      Blog developed <a href="https://github.com/Sam3million/Sam3million.github.io">on GitHub</a>
+    </div>
+    <div id="footer-left">
+      <a href="https://github.com/">
+        @
+      </a>
+    </div>
+  </div>
+</footer>
+
+  </body>
+
+</html>

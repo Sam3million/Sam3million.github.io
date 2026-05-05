@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <title>
+        
+            Hyper Marching Cubes · Sammy's Portfolio
+        
+    </title>
+    <meta name="description" content="Portfolio specializing in real-time rendering and shaders.">
+
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/assets/fonts/stylesheet.css">
+    <link rel="canonical" href="http://localhost:4000/gamedev/2026/03/28/marching-cubes.html">
+
+    <!--[if IE]><link rel="shortcut icon" href="/favicon.ico"><![endif]-->
+    <link rel="apple-touch-icon-precomposed" href="/touch-icon-180px.png">
+    <link rel="icon" href="/favicon-196px.png">
+
+    <script type="text/javascript" src="/js/app.js"></script>
+</head>
+
+
+  <body lang="en">
+    <div id="all">
+      <div id="center-all">
+
+        <header id="site-header">
+  <div id="header-title">
+    <style>
+      #header-img {
+        width: 135x;           /* Set a specific size */
+        height: 135px;          /* Must match width for a perfect circle */
+        object-fit: cover;      /* Prevents your face from looking squashed */
+        border-radius: 50%;     /* The magic "circle" line */
+        border: 3px solid #367700; /* Optional: matches your green theme */
+        display: block;
+        margin: 0 auto;         /* Centers it if needed */
+      }
+    </style>
+    
+    <img id="header-img" src="/img/profile.png" alt="Profile Picture">
+    <div id="header-link">
+      <a href="/">Sammy's Portfolio</a>
+    </div>
+  </div>
+
+  <div id="header-desc">
+    <span id="header-desc-inner">🍂</span>
+  </div>
+  <div id="header-desc-border"></div>
+</header>
+
+
+        <div class="page-content">
+          <div class="wrapper">
+            <div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">Hyper Marching Cubes</h1>
+    <p class="post-meta">Mar 28, 2026</p>
+  </header>
+
+  <article class="post-content">
+    <p>This post describes my journey with the Marching Cubes algorithm. I also describe my variation on the algorithm, which I call “Hyper Marching Cubes”.
+This version allows for unique vertex output, faster triangulation, and faster per-vertex normal calculation. It doesn’t use any Dictionary/HashMap
+collections, making it well suited for both multithreaded CPU and compute shader GPU implementations. My CPU implementation is able to mesh a 32x32x32
+volume in around 0.2 ms without duplicate vertices and with angle-weighted per-vertex normals. This does come at the cost of some memory.</p>
+
+<video width="100%;" autoplay="" muted="" controls="" loop="" playsinline="">
+  <source src="/assets/marching-cubes/hyper-marching-cubes.mp4" type="video/mp4" />
+</video>
+
+<div class="tldr">
+  <h1 id="key-takeaways">🔑 Key takeaways</h1>
+  <ul>
+    <li>Variation of Marching Cubes algorithm that directly produces unique vertices and per-vertex normals</li>
+    <li>Can be implemented easily on both the CPU and GPU</li>
+    <li>CPU implementation meshes 32^3 volume in 0.2 ms</li>
+    <li>Higher (but fixed) memory cost compared to standard Marching Cubes</li>
+  </ul>
+</div>
+
+<h1 id="background">Background</h1>
+
+<p>The marching cubes algorithm generates a mesh for a 3d noise volume. In technical terms, it reconstructs the isosurface.
+Due to its capacity to produce arbitrary meshes, it is often used for procedurally generated terrain. Terrain can be modified
+by altering the underlying noise volume, then remeshing using the algorithm. For a great overview of the algorthm,
+see <a href="https://www.youtube.com/watch?v=vTMEdHcKgM4">Sebastian Lague’s Terraforming Video</a>.</p>
+
+<h1 id="hyper-marching-cubes">Hyper Marching Cubes</h1>
+
+<p>This section describes the current state of my implementation, with all the tricks I’ve come up with.
+It runs multithreaded using Burst-compiled Jobs.
+I feel that I’ve changed the core algorithm enough that I get to call it something different.
+So, I am giving it the name “Hyper Marching Cubes”.
+The crucial difference between the Hyper Marching Cubes algorithm and the standard version are that we can perform triangulation
+and per-vertex normal calculation at the same time as we output vertices, with the addition of some very cheap post-processing steps.</p>
+
+<h2 id="unique-edge-index">Unique Edge Index</h2>
+
+<p>In standard implementations of marching cubes, you first generate “Vertex Groups,” which are vertex triplets
+that represent a triangle. After all vertex groups have been generated, you can then generate the triangle indices. 
+I wanted to find a way to generate the triangle indices immediately alongside the vertices.</p>
+
+<p>First, what is the triangle index data actually saying? Well, it’s telling the GPU to connect certain vertices.
+For example, vertices 0, 3, and 8 form a triangle.</p>
+
+<p>put image here</p>
+
+<p>As I stated before, we can’t generate the triangulation right away because we don’t know what index in the output vertex array
+a given vertex will end up. But I thought that there must be a different way of representing the triangulation that didn’t rely on this.
+After thinking about this problem for a couple of weeks, I realized the solution: edges. Rather than outputting
+triangle data as connections between vertices, I could output them as connections between edges in the volume! Then, in a post-processing
+stage, once the vertex count was known, I could remap them to the actual indices. To make this work, I would need
+a way to assign a unique number to each edge in the volume.</p>
+
+<p><img src="/assets/marching-cubes/single-cube-edges.svg" alt="Each edge can be assigned a unique index" />
+<em>Each edge can be assigned a unique index</em></p>
+
+<p>For a 2x2x2 volume (1x1x1 cube), we can number the edges 0-11 easily. I did this manually up to 4x4x4 to get an idea of the pattern.
+Now how do we do this programmatically?</p>
+
+<p><img src="/assets/marching-cubes/position-labeled-edges.svg" alt="Each edge can be assigned a 3d position" width="100px" />
+<em>Each edge can be assigned a 3d position</em></p>
+
+<p>First we assign each edge a spacial position since this can be done easily for every cube in the volume.
+This position encodes the same information as the index, so there should exist some function f(x,y,z) that takes in the edge position 
+and outputs the index. I derived the following, which essentially just counts the number of edges before this one:</p>
+
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">/// &lt;summary&gt;</span>
+<span class="c1">/// Each edge in an (R.x-1) * (R.y-1) * (R.z-1) volume of unit cubes can be assigned a unique index.</span>
+<span class="c1">/// Samuel Rose 2025.</span>
+<span class="c1">/// &lt;/summary&gt;</span>
+<span class="c1">/// &lt;param name="index3D"&gt;The 3d position of the edge, where each edge in a single unit cube has xyz coords ranging from 0-2.&lt;/param&gt;</span>
+<span class="c1">/// &lt;param name="resolution"&gt;R, the dimensions of the volume of points.&lt;/param&gt;</span>
+<span class="c1">/// &lt;returns&gt;If R.x=R.y=R.z, returns an index in the range [ 0, 3*R^2*(R-1) )&lt;/returns&gt;</span>
+<span class="k">public</span> <span class="k">static</span> <span class="kt">int</span> <span class="nf">UniqueEdgeIndex</span><span class="p">(</span><span class="n">int3</span> <span class="n">index3D</span><span class="p">,</span> <span class="n">int3</span> <span class="n">resolution</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">index3D</span><span class="p">.</span><span class="n">x</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> 
+        <span class="n">resolution</span><span class="p">.</span><span class="n">x</span> <span class="p">*</span> <span class="p">(</span><span class="n">index3D</span><span class="p">.</span><span class="n">z</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> 
+        <span class="p">(</span><span class="n">resolution</span><span class="p">.</span><span class="n">x</span> <span class="p">-</span> <span class="m">1</span><span class="p">)</span> <span class="p">*</span> <span class="p">((</span><span class="n">index3D</span><span class="p">.</span><span class="n">z</span> <span class="p">+</span> <span class="m">1</span><span class="p">)</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">*</span> <span class="p">(</span><span class="m">1</span> <span class="p">-</span> <span class="p">(</span><span class="n">index3D</span><span class="p">.</span><span class="n">y</span> <span class="p">&amp;</span> <span class="m">1</span><span class="p">))</span> <span class="p">+</span> 
+        <span class="n">resolution</span><span class="p">.</span><span class="n">x</span> <span class="p">*</span> <span class="n">resolution</span><span class="p">.</span><span class="n">z</span> <span class="p">*</span> <span class="p">(</span><span class="n">index3D</span><span class="p">.</span><span class="n">y</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> 
+        <span class="p">(</span><span class="n">resolution</span><span class="p">.</span><span class="n">x</span> <span class="p">*</span> <span class="p">(</span><span class="n">resolution</span><span class="p">.</span><span class="n">z</span> <span class="p">-</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> <span class="n">resolution</span><span class="p">.</span><span class="n">z</span> <span class="p">*</span> <span class="p">(</span><span class="n">resolution</span><span class="p">.</span><span class="n">x</span> <span class="p">-</span> <span class="m">1</span><span class="p">))</span> <span class="p">*</span> <span class="p">((</span><span class="n">index3D</span><span class="p">.</span><span class="n">y</span> <span class="p">+</span> <span class="m">1</span><span class="p">)</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Setting <code class="language-plaintext highlighter-rouge">resolution.x = resolution.y = resolution.z = R</code> and plugging in the max edge position of <code class="language-plaintext highlighter-rouge">((R-1)*2-1, (R-1)*2, (R-1)*2)</code>, we can see that the maximum value
+produced by the function is <code class="language-plaintext highlighter-rouge">3 * R^2 * (R-1) - 1</code>. Adding 1, this polynomial outputs the sequence 12, 54, 144, 300, 540, …
+for R &gt;= 2. Inputting this into the online encyclopedia of integer sequences, we see <a href="https://oeis.org/A059986">A059986</a>,
+which confirms that the original function is correct.</p>
+
+<p>Now, instead of outputting a vertex group, we can output an int3 with the three edges to connect.
+We’ll need 2 post-processing stages in which we remap edge to index.
+To do this, we must allocate an int array of size <code class="language-plaintext highlighter-rouge">MaxUniqueVertices</code>, which is equal to that <code class="language-plaintext highlighter-rouge">3R^2*(R-1)</code> from before. We’ll run the first post-processing stage
+over the number of unique vertices output by marching cubes. We then write the current index to this int array at the index
+of this vertex’s unique edge index.</p>
+
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">void</span> <span class="nf">Execute</span><span class="p">(</span><span class="kt">int</span> <span class="n">index</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// Assign each vertex a unique index in the range 0 to vertexCount-1:</span>
+    <span class="kt">int</span> <span class="n">vertexEdge</span> <span class="p">=</span> <span class="n">vertexEdges</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+    <span class="n">indexByEdge</span><span class="p">[</span><span class="n">vertexEdge</span><span class="p">]</span> <span class="p">=</span> <span class="n">index</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>The second stage runs for each triangle, and reads in the indices we stored in the first stage.</p>
+
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">void</span> <span class="nf">Execute</span><span class="p">(</span><span class="kt">int</span> <span class="n">index</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// Remap the triangles to use the new vertex indices:</span>
+    <span class="n">int3</span> <span class="n">triangle</span> <span class="p">=</span> <span class="n">triangles</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+    <span class="n">triangles</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">int3</span><span class="p">(</span><span class="n">indexByEdge</span><span class="p">[</span><span class="n">triangle</span><span class="p">.</span><span class="n">z</span><span class="p">],</span> <span class="n">indexByEdge</span><span class="p">[</span><span class="n">triangle</span><span class="p">.</span><span class="n">y</span><span class="p">],</span> <span class="n">indexByEdge</span><span class="p">[</span><span class="n">triangle</span><span class="p">.</span><span class="n">x</span><span class="p">]);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>It might be hard to understand, so here’s a visual breakdown of what’s going on:</p>
+
+<p><img src="/assets/marching-cubes/edge-connections.png" alt="Each edge can be assigned a 3d position" /></p>
+
+<p>Let’s say the mesh outputs 9 vertices and 3 triangles. In addition to the vertex positions,
+we also output the vertex edge numbers.</p>
+
+<p><img src="/assets/marching-cubes/meshing-output-1.svg" alt="Each edge can be assigned a 3d position" /></p>
+
+<p>In the first post-processing stage, we map vertex edge number to its position in the vertices array by
+using the edge as an index into an array.</p>
+
+<p><img src="/assets/marching-cubes/meshing-output-2.svg" alt="Each edge can be assigned a 3d position" /></p>
+
+<p>In the second post-processing stage, we remap the triangles to use these values.</p>
+
+<p><img src="/assets/marching-cubes/meshing-output-3.svg" alt="Each edge can be assigned a 3d position" /></p>
+
+<h2 id="fast-per-vertex-normals">Fast Per-Vertex Normals</h2>
+
+<p>This edge indexing technique also allows us to generate per-vertex normals much faster.
+Normally, you would have to go through all triangles, calculate their normals,
+and sum them for each vertex. We can instead use the edges as an index into a local sum array.
+Since each vertex can only be used by 4 cubes, we allocate a float array of length <code class="language-plaintext highlighter-rouge">MaxVertices * 4 * 3</code>.
+The <code class="language-plaintext highlighter-rouge">* 3</code> is because each normal has 3 components. Each bucket of 12 floats within this array describes the
+triangle normals that could affect a vertex.</p>
+
+<p>We’ll need another formula to tell us which 0-3 slot a cube is in relative to a given edge.
+This can be calculated from the 3D edge offset again.</p>
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">// edgeOffset3D has components in the range 0-2.</span>
+<span class="c1">// returns an index [0-3].</span>
+<span class="kt">int</span> <span class="nf">RelativeCubeIndex</span><span class="p">(</span><span class="n">int3</span> <span class="n">edgeOffset3D</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">return</span> <span class="p">((</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">z</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> <span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">y</span><span class="p">)</span> <span class="p">*</span> <span class="p">(</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">x</span> <span class="p">&amp;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span>
+            <span class="p">((</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">x</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> <span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">z</span><span class="p">)</span> <span class="p">*</span> <span class="p">(</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">y</span> <span class="p">&amp;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span>
+            <span class="p">((</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">y</span> <span class="p">&gt;&gt;</span> <span class="m">1</span><span class="p">)</span> <span class="p">+</span> <span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">x</span><span class="p">)</span> <span class="p">*</span> <span class="p">(</span><span class="n">edgeOffset3D</span><span class="p">.</span><span class="n">z</span> <span class="p">&amp;</span> <span class="m">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>When we calculate the triangles during meshing, we keep track of the per-vertex normal sums within this cube.
+Then after processing all of its triangles, we write the normal contributions to the correct slot.</p>
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Span</span><span class="p">&lt;</span><span class="n">float3</span><span class="p">&gt;</span> <span class="n">cubeNormalSums</span> <span class="p">=</span> <span class="k">stackalloc</span> <span class="n">float3</span><span class="p">[</span><span class="m">12</span><span class="p">];</span>
+<span class="n">cubeNormalSums</span><span class="p">.</span><span class="nf">Clear</span><span class="p">();</span>
+<span class="p">...</span>
+<span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">j</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">j</span> <span class="p">&lt;</span> <span class="n">triangleCount</span><span class="p">;</span> <span class="n">j</span><span class="p">+=</span><span class="m">3</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="kt">int</span> <span class="n">edge0</span> <span class="p">=</span> <span class="n">remappedTriangulation</span><span class="p">[</span><span class="n">config</span> <span class="p">*</span> <span class="m">16</span> <span class="p">+</span> <span class="n">j</span><span class="p">];</span>
+    <span class="kt">int</span> <span class="n">edge1</span> <span class="p">=</span> <span class="n">remappedTriangulation</span><span class="p">[</span><span class="n">config</span> <span class="p">*</span> <span class="m">16</span> <span class="p">+</span> <span class="n">j</span> <span class="p">+</span> <span class="m">1</span><span class="p">];</span>
+    <span class="kt">int</span> <span class="n">edge2</span> <span class="p">=</span> <span class="n">remappedTriangulation</span><span class="p">[</span><span class="n">config</span> <span class="p">*</span> <span class="m">16</span> <span class="p">+</span> <span class="n">j</span> <span class="p">+</span> <span class="m">2</span><span class="p">];</span>
+    
+    <span class="n">float3</span> <span class="n">vertexA</span> <span class="p">=</span> <span class="n">vertexCache</span><span class="p">[</span><span class="n">edge0</span><span class="p">];</span>
+    <span class="n">float3</span> <span class="n">vertexB</span> <span class="p">=</span> <span class="n">vertexCache</span><span class="p">[</span><span class="n">edge1</span><span class="p">];</span>
+    <span class="n">float3</span> <span class="n">vertexC</span> <span class="p">=</span> <span class="n">vertexCache</span><span class="p">[</span><span class="n">edge2</span><span class="p">];</span>
+    
+    <span class="n">float3</span> <span class="n">ab</span> <span class="p">=</span> <span class="n">vertexB</span> <span class="p">-</span> <span class="n">vertexC</span><span class="p">;</span>
+    <span class="n">float3</span> <span class="n">bc</span> <span class="p">=</span> <span class="n">vertexA</span> <span class="p">-</span> <span class="n">vertexC</span><span class="p">;</span>
+    <span class="n">float3</span> <span class="n">ca</span> <span class="p">=</span> <span class="n">vertexA</span> <span class="p">-</span> <span class="n">vertexC</span><span class="p">;</span>
+    <span class="n">float3</span> <span class="n">cross</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">cross</span><span class="p">(-</span><span class="n">ca</span><span class="p">,</span> <span class="n">ab</span><span class="p">);</span>
+    <span class="kt">float</span> <span class="n">crossLength</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">length</span><span class="p">(</span><span class="n">cross</span><span class="p">);</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">crossLength</span> <span class="p">&gt;</span> <span class="m">0.0001f</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">float3</span> <span class="n">normal</span> <span class="p">=</span> <span class="n">cross</span> <span class="p">/</span> <span class="n">crossLength</span><span class="p">;</span>
+        
+        <span class="kt">float</span> <span class="n">angleA</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">atan2</span><span class="p">(</span><span class="n">crossLength</span><span class="p">,</span> <span class="n">math</span><span class="p">.</span><span class="nf">dot</span><span class="p">(</span><span class="n">ab</span><span class="p">,</span> <span class="p">-</span><span class="n">ca</span><span class="p">));</span>
+        <span class="kt">float</span> <span class="n">angleB</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">atan2</span><span class="p">(</span><span class="n">crossLength</span><span class="p">,</span> <span class="n">math</span><span class="p">.</span><span class="nf">dot</span><span class="p">(</span><span class="n">bc</span><span class="p">,</span> <span class="p">-</span><span class="n">ab</span><span class="p">));</span>
+        <span class="kt">float</span> <span class="n">angleC</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">atan2</span><span class="p">(</span><span class="n">crossLength</span><span class="p">,</span> <span class="n">math</span><span class="p">.</span><span class="nf">dot</span><span class="p">(</span><span class="n">ca</span><span class="p">,</span> <span class="p">-</span><span class="n">bc</span><span class="p">));</span>
+        
+        <span class="n">cubeNormalSums</span><span class="p">[</span><span class="n">edge0</span><span class="p">]</span> <span class="p">+=</span> <span class="n">normal</span> <span class="p">*</span> <span class="n">angleC</span><span class="p">;</span>
+        <span class="n">cubeNormalSums</span><span class="p">[</span><span class="n">edge1</span><span class="p">]</span> <span class="p">+=</span> <span class="n">normal</span> <span class="p">*</span> <span class="n">angleB</span><span class="p">;</span>
+        <span class="n">cubeNormalSums</span><span class="p">[</span><span class="n">edge2</span><span class="p">]</span> <span class="p">+=</span> <span class="n">normal</span> <span class="p">*</span> <span class="n">angleA</span><span class="p">;</span>
+        
+        <span class="n">int3</span> <span class="n">triangle</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">int3</span><span class="p">(</span><span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">edge0</span><span class="p">],</span> <span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">edge1</span><span class="p">],</span> <span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">edge2</span><span class="p">]);</span> 
+        <span class="n">triangles</span><span class="p">[</span><span class="n">reservedTriangleRangeStartIndex</span> <span class="p">+</span> <span class="n">totalTriangleCount</span><span class="p">]</span> <span class="p">=</span> <span class="n">triangle</span><span class="p">;</span>
+        <span class="n">totalTriangleCount</span><span class="p">++;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+<span class="c1">// After we've processed all triangles, we write the normal contributions from this cube to the correct slot for each vertex</span>
+<span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">j</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">j</span> <span class="p">&lt;</span> <span class="m">12</span><span class="p">;</span> <span class="n">j</span><span class="p">++)</span>
+<span class="p">{</span>
+    <span class="c1">// Only write if we did use this vertex:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="p">!=</span> <span class="p">-</span><span class="m">1</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="kt">int</span> <span class="n">cubeIndex</span> <span class="p">=</span> <span class="nf">RelativeCubeIndex</span><span class="p">(</span><span class="nf">offset</span><span class="p">(</span><span class="n">j</span><span class="p">));</span>
+        <span class="n">float3</span> <span class="n">sum</span> <span class="p">=</span> <span class="n">cubeNormalSums</span><span class="p">[</span><span class="n">j</span><span class="p">];</span>
+        <span class="n">normalsSumPerVertex</span><span class="p">[</span><span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">0</span> <span class="p">+</span> <span class="n">cubeIndex</span><span class="p">]</span> <span class="p">=</span> <span class="n">sum</span><span class="p">.</span><span class="n">x</span><span class="p">;</span>
+        <span class="n">normalsSumPerVertex</span><span class="p">[</span><span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">4</span> <span class="p">+</span> <span class="n">cubeIndex</span><span class="p">]</span> <span class="p">=</span> <span class="n">sum</span><span class="p">.</span><span class="n">y</span><span class="p">;</span>
+        <span class="n">normalsSumPerVertex</span><span class="p">[</span><span class="n">edgeNumberCache</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">8</span> <span class="p">+</span> <span class="n">cubeIndex</span><span class="p">]</span> <span class="p">=</span> <span class="n">sum</span><span class="p">.</span><span class="n">z</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Finally, in a post-processing stage, we sum the 4 float3s for each vertex to get the final normal.
+We can actually do this in the same stage as when we map vertex edge to index.</p>
+<div class="language-c# highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">void</span> <span class="nf">Execute</span><span class="p">(</span><span class="kt">int</span> <span class="n">index</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// Assign each vertex a unique index in the range 0 to vertexCount-1:</span>
+    <span class="kt">int</span> <span class="n">vertexEdge</span> <span class="p">=</span> <span class="n">vertexEdges</span><span class="p">[</span><span class="n">index</span><span class="p">];</span>
+    <span class="n">indexByEdge</span><span class="p">[</span><span class="n">vertexEdge</span><span class="p">]</span> <span class="p">=</span> <span class="n">index</span><span class="p">;</span>
+    
+    <span class="c1">// Calculate normal:</span>
+    <span class="n">float3</span> <span class="n">sum</span> <span class="p">=</span> <span class="n">float3</span><span class="p">.</span><span class="n">zero</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="p">=</span> <span class="m">0</span><span class="p">;</span> <span class="n">i</span> <span class="p">&lt;</span> <span class="m">4</span><span class="p">;</span> <span class="n">i</span><span class="p">++)</span>
+    <span class="p">{</span>
+        <span class="n">sum</span><span class="p">.</span><span class="n">x</span> <span class="p">+=</span> <span class="n">normalSumByVertexIndex</span><span class="p">[</span><span class="n">specialIndex</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">0</span> <span class="p">+</span> <span class="n">i</span><span class="p">];</span>
+        <span class="n">sum</span><span class="p">.</span><span class="n">y</span> <span class="p">+=</span> <span class="n">normalSumByVertexIndex</span><span class="p">[</span><span class="n">specialIndex</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">4</span> <span class="p">+</span> <span class="n">i</span><span class="p">];</span>
+        <span class="n">sum</span><span class="p">.</span><span class="n">z</span> <span class="p">+=</span> <span class="n">normalSumByVertexIndex</span><span class="p">[</span><span class="n">specialIndex</span> <span class="p">*</span> <span class="m">12</span> <span class="p">+</span> <span class="m">8</span> <span class="p">+</span> <span class="n">i</span><span class="p">];</span>
+    <span class="p">}</span>
+    <span class="n">UnsafeUtility</span><span class="p">.</span><span class="nf">MemClear</span><span class="p">(</span><span class="n">addr</span><span class="p">,</span> <span class="m">12</span> <span class="p">*</span> <span class="m">4</span><span class="p">);</span>
+    
+    <span class="p">(</span><span class="n">uniqueVerticesListPtr</span> <span class="p">+</span> <span class="n">index</span><span class="p">)-&gt;</span><span class="n">Normal</span> <span class="p">=</span> <span class="n">math</span><span class="p">.</span><span class="nf">normalizesafe</span><span class="p">(</span><span class="n">sum</span><span class="p">,</span> <span class="k">new</span> <span class="nf">float3</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">0</span><span class="p">));</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h1 id="results">Results</h1>
+
+<h2 id="cpu-implementation">CPU Implementation</h2>
+
+<h2 id="gpu-implementation">GPU Implementation</h2>
+
+<h1 id="naive-cpu-implementation">Naive CPU Implementation</h1>
+
+<p>To first gain a better understanding of how the algorithm worked, I implemented a naive CPU-based version.
+This was very slow but it functioned and allowed me to fully grasp the algorithm.</p>
+
+<video width="100%;" muted="" controls="" loop="" playsinline="" autoplay="">
+  <source src="/assets/marching-cubes/digging.mp4" type="video/mp4" />
+</video>
+
+<h1 id="slow-gpu-implementation">Slow GPU Implementation</h1>
+
+<p>In Sebastian Lague’s video, he used a compute shader to generate the mesh. This gave him speedups, so I thought
+it was the logical next step. I implemented it, and it was faster than my terrible CPU implementation.
+However, it was still sort of slow, as getting the mesh data back from the GPU had a large delay (and was just annoying).</p>
+
+<p>If we were using a fully GPU driven terrain rendering approach, GPU meshing might have more merit. But if the CPU for any reason
+needs the data (e.g. for Physics, Networking), I realized that it’s better to just do it on the CPU.</p>
+
+<video width="100%;" muted="" controls="" loop="" playsinline="" autoplay="">
+  <source src="/assets/marching-cubes/gpu-based.mp4" type="video/mp4" />
+</video>
+
+<h1 id="future-work">Future Work</h1>
+
+<p>A common downside of marching cubes in compute shader approaches is that you can’t really produce unique vertices without sending the data back to the CPU.
+Since Hyper Marching Cubes produces unique vertices directly, it is actually quite GPU friendly. It would be interesting to implement it with a series of 
+compute shaders and use fully GPU-based rendering. The first dispatch would do the meshing, the second would be an indirect dispatch to remap the indices
+and calculate normals, and the third would be another indirect dispatch to triangulate. All could be done on the GPU without any special data structures.</p>
+
+  </article>
+  <img src="/img/bottom.png" class="post-bottom"/>
+
+  <!-- <h2 style="margin-bottom: 20px;">Comments</h2>
+  <div class="comments-container" id="comments-container">
+    <div class="comments-gradient" id="comments-gradient">
+      <button id="show-all-button">Show all comments</button>
+    </div>
+    <script src="https://utteranc.es/client.js"
+            repo="LukasKalbertodt/LukasKalbertodt.github.io"
+            issue-term="pathname"
+            crossorigin="anonymous"
+            async>
+    </script>
+  </div> -->
+</div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <footer id="site-footer">
+  <div id="footer-content">
+    <div id="footer-right">
+      Blog developed <a href="https://github.com/Sam3million/Sam3million.github.io">on GitHub</a>
+    </div>
+    <div id="footer-left">
+      <a href="https://github.com/">
+        @
+      </a>
+    </div>
+  </div>
+</footer>
+
+  </body>
+
+</html>
