@@ -2,7 +2,7 @@
 layout: post
 title: "Custom Render Pipeline"
 date: 2025-08-16
-thumbnail: "/assets/aridsun/arid-sun-1.png"
+thumbnail: "/assets/render-pipeline/thumbnail.png"
 category: gamedev
 ---
 
