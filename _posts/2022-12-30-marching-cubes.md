@@ -7,10 +7,10 @@ category: gamedev
 ---
 
 This post describes my variation on the Marching Cubes algorithm, which I call "Hyper Marching Cubes".
-This version allows for unique vertex output, faster triangulation, and faster per-vertex normal calculation. It doesn't use any Dictionary/HashMap
-collections or atomic operations, making it well suited for both multithreaded CPU and compute shader GPU implementations. My SIMD CPU implementation
-is able to mesh a 128x128x128 volume in 2.14 ms without duplicate vertices and with weighted per-vertex normals (on Apple M1 Pro 10 Core CPU).
-My compute shader implementation is able to mesh the same volume in __ ms. This does come at the cost of some memory.
+It allows for unique vertex output and faster triangulation. It doesn't use any Dictionary/HashMap
+collections, making it well suited for both multithreaded CPU and compute shader GPU implementations. My SIMD CPU implementation
+is able to mesh a 128x128x128 volume in 1.33 ms without duplicate vertices and with per-vertex normals.
+My compute shader implementation is able to mesh the same volume in 0.88 ms. This does come at the cost of some memory.
 
 <video width="100%;" autoplay muted controls loop playsinline>
   <source src="/assets/marching-cubes/hyper-marching-cubes.mp4" type="video/mp4">
@@ -18,11 +18,11 @@ My compute shader implementation is able to mesh the same volume in __ ms. This 
 
 <div class="tldr" markdown="1">
 # 🔑 Key takeaways
-- Variation of Marching Cubes algorithm that directly produces unique vertices and per-vertex normals
+- Variation of Marching Cubes algorithm that produces unique vertices and triangulation without Dictionary/HashMap
 - Can be implemented easily on both the CPU and GPU
-- CPU implementation meshes 128^3 volume in 2.14 ms
-- GPU implementation meshes 128^3 volume in __ ms
-- Higher (but fixed) memory cost compared to standard Marching Cubes
+- CPU implementation meshes 128^3 volume in 1.33 ms
+- GPU implementation meshes 128^3 volume in 0.88 ms
+- Slightly higher memory cost compared to standard Marching Cubes
 </div>
 
 # Background
@@ -36,17 +36,18 @@ see <a href="https://www.youtube.com/watch?v=vTMEdHcKgM4">Sebastian Lague's Terr
 # Hyper Marching Cubes
 
 The crucial difference between the Hyper Marching Cubes algorithm and the standard version is that we can perform triangulation
-and per-vertex normal calculation at the same time as we output vertices, with the addition of some very cheap post-processing steps.
+at the same time as we output vertices, with the addition of some very cheap post-processing steps.
 
 ## Unique Edge Index
 
 The key to this algorithm is the assignment of a unique index to each edge in the noise volume. We can then represent triangles
 as connections between different edges rather than connections between vertices. Then, in a post-processing stage, once the
-vertex count is known, we can remap to the actual vertex indices. To make this work, I would need a way to assign a unique
-number to each edge in the volume. For a 2x2x2 volume (1x1x1 cube), we can number the edges 0-11 easily. But how can we do it programmatically?
+vertex count is known, we can remap to the actual vertex indices. To make this work, we need a way to assign a unique
+number to each edge in the volume. For a 2x2x2 volume (1x1x1 cube), we can number the edges 0-11 easily. But how can we do it programmatically
+for larger volumes?
 
 ![Each edge can be assigned a unique index](/assets/marching-cubes/single-cube-edges.svg)
-*Each edge can be assigned a unique index*
+*Each edge can be assigned a unique index. This is easy for the base case.*
 
 ![Each edge can be assigned a 3d position](/assets/marching-cubes/position-labeled-edges.svg)
 *Each edge can be assigned a 3d position*
@@ -88,8 +89,8 @@ NativeArray<int> indexByEdge = new (MaxVertices, Allocator.Persistent);
 public void Execute(int index)
 {
     // Assign each vertex a unique index in the range 0 to vertexCount-1:
-    int vertexEdge = vertexEdges[index];
-    indexByEdge[vertexEdge] = index;
+    int volumeEdgeNumber = vertexEdges[index];
+    indexByEdge[volumeEdgeNumber] = index;
 }
 ```
 
@@ -109,7 +110,7 @@ It might be hard to understand, so here's a visual breakdown of what's going on:
 ![Edge Connections](/assets/marching-cubes/edge-connections.png)
 
 Let's say the mesh outputs 9 vertices and 3 triangles. In addition to the vertex positions,
-we also output the vertex edge numbers.
+we also output the vertex edge numbers to a separate array.
 
 ![Meshing Output 1](/assets/marching-cubes/meshing-output-1.svg)
 
@@ -123,11 +124,12 @@ that first triangle correctly connects the vertices at indices 8, 2, and 4.
 
 ![Meshing Output 3](/assets/marching-cubes/meshing-output-3.svg)
 
+What we did was essentially replace a Dictionary/Hashmap with an array by having a perfect hashing function.
+
+<!--
 ## Fast Per-Vertex Normals
 
-This edge indexing technique also allows us to generate per-vertex normals much faster.
-Normally, you would have to go through all triangles, calculate their normals,
-and sum them for each vertex. We can instead use the edges as an index into a normal sum array.
+This edge indexing technique also allows us to generate fast per-vertex normals. 
 
 Since each vertex can only be used by 4 cubes, we allocate a float3 array of length `MaxVertices * 4`.
 Each bucket of 4 float3s within this array describes the triangle normals that could possibly affect a
@@ -217,44 +219,67 @@ public void Execute(int index)
     (uniqueVerticesListPtr + index)->Normal = math.normalizesafe(sum, new float3(0, 1, 0));
 }
 ```
+-->
+
+## CPU Implementation
+
+In my CPU implementation I use Unity's Job System, the Burst compiler, and SIMD to get the most out of the hardware.
+I run an IJobParalellFor where each thread is a different Y-Z location on the left side of the noise volume.
+I then use SIMD for almost every task, including loading noise values, calculating cube configurations, and generating vertices.
+To get a compact vertex and index output without using atomics, I do a prefix sum compaction stage. Then I run the remapping and
+triangulation post processing stages as described above. Per-vertex normals are calculated from the noise value deltas at vertex generation time.
+
+## Compute Shader Implementation
+
+All the code snippets shown were from my CPU implementation, but this algorithm lends itself well
+to using compute shaders. This allows for a fully GPU-driven mesh generation and rendering approach.
+
+So, I went ahead and did just that. My compute shader version uses 5 different kernels to mesh the volume and prepare it for rendering.
+The remapping and triangle post-processing kernels are dispatched indirectly based on the output vertex and index counts. I only did basic
+optimization, so it could probably be improved a lot more (e.g. using Wave Intrinsics). Still, the results are impressive.
+
+![Compute Shader](/assets/marching-cubes/compute-shader.png)
 
 # Results
 
+For the CPU-based implementations I used the Unity profiler to measure average time to fully recreate and upload the mesh.
+Note this doesn't include the time spent modifying the underlying noise volume or rendering the mesh. For my compute shader 
+implementation I used the Xcode debugger to capture frame data and summed the time spent on the mesh generation kernels.
+This is running on a 2021 Macbook Pro with 10 Core CPU, 16 Core GPU.
+
 | Volume Resolution: | 32^3 | 64^3 | 128^3 |
 | :--- | :---: | :---: | :--- |
-| Naive Approach | _ ms | _ ms | _ ms |
-| Standard Bursted Job | _ ms | _ ms | _ ms |
-| **Compute Shader Hyper Marching Cubes** | **_ ms** | **_ ms** | **_ ms** |
-| **SIMD Multithreaded Hyper Marching Cubes** | **0.20ms** | **0.50 ms** | **2.16 ms** |
+| Naive Approach | 7.40 ms | 39.82 ms | 206.41 ms |
+| Sebastian Lague | 10.40 ms | 23.61 ms | 256.39 ms |
+| Hyper Marching Cubes (SIMD Multithreaded) | 0.19 ms | 0.42 ms | 1.33 ms |
+| Hyper Marching Cubes (Compute Shader) | 0.038 ms | 0.17 ms | 0.88 ms |
+
+## Memory Usage
+This runtime speed does come at the cost of memory, since we have to allocate the vertexEdges and indexByVertex arrays.
+However, these are relatively cheap additions to standard marching cubes implementations that already have large buffers
+for storing vertices, indices, normals, etc.
+
+| Volume Resolution: | 32^3 | 64^3 | 128^3 |
+| :--- | :---: | :---: | :--- |
+| Vertices | 1.14 MB  | 9.29 MB | 74.91 MB |
+| Indices | 1.79 MB  | 15.00 MB | 122.90 MB |
+| Normals | 1.14 MB  | 9.29 MB | 74.91 MB |
+| VertexEdges | 0.38 MB  | 3.10 MB | 24.97 MB |
+| IndexByVertex | 0.38 MB  | 3.10 MB | 24.97 MB |
+| **Total Memory Usage** | **4.83 MB**  | **39.78 MB** | **322.66 MB** |
 
 ## Usage In Game
 
-<!--
-# Naive CPU Implementation
+Here's some footage of me using Hyper Marching Cubes to deform the terrain in my open-world survival game.
 
-To first gain a better understanding of how the algorithm worked, I implemented a naive CPU-based version.
-This was very slow but it functioned and allowed me to fully grasp the algorithm.
-
-<video width="100%;" muted controls loop playsinline autoplay>
-  <source src="/assets/marching-cubes/digging.mp4" type="video/mp4">
+<video width="100%;" autoplay muted controls loop playsinline>
+  <source src="/assets/marching-cubes/in-game-demo.mp4" type="video/mp4">
 </video>
 
-# Slow GPU Implementation
-
-In Sebastian Lague's video, he used a compute shader to generate the mesh. This gave him speedups, so I thought
-it was the logical next step. I implemented it, and it was faster than my terrible CPU implementation.
-However, it was still sort of slow, as getting the mesh data back from the GPU had a large delay (and was just annoying).
-
-If we were using a fully GPU driven terrain rendering approach, GPU meshing might have more merit. But if the CPU for any reason
-needs the data (e.g. for Physics, Networking), I realized that it's better to just do it on the CPU.
-
-<video width="100%;" muted controls loop playsinline autoplay>
-  <source src="/assets/marching-cubes/gpu-based.mp4" type="video/mp4">
-</video> 
--->
 # Future Work
 
-- AVX Implementation
-- Per-Triangle Normals (but without duplicate vertices)
-- Meshlets instead of full mesh for optimized rendering
-- Reduced memory cost
+- AVX Implementation for x86 CPUs
+- Per-Triangle Normals (flat shading)
+- Produce Meshlets Instead of Full Mesh
+- Reduce Memory Cost (maybe bit packing?)
+- Use it for Simulations
