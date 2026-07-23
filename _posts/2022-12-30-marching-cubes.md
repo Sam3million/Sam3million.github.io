@@ -2,6 +2,7 @@
 layout: post
 title: "Hyper Marching Cubes"
 date: 2026-03-28
+modified: 2026-07-22
 thumbnail: "/assets/marching-cubes/thumbnail.png"
 category: gamedev
 ---
@@ -12,9 +13,17 @@ collections, making it well suited for both multithreaded CPU and compute shader
 is able to mesh a 128x128x128 volume in 1.33 ms without duplicate vertices and with per-vertex normals.
 My compute shader implementation is able to mesh the same volume in 0.88 ms. This does come at the cost of some memory.
 
-<video width="100%;" autoplay muted controls loop playsinline>
-  <source src="/assets/marching-cubes/hyper-marching-cubes.mp4" type="video/mp4">
-</video>
+<div align="center">
+    <video width="80%" autoplay muted controls loop playsinline>
+    <source src="/assets/marching-cubes/hyper-marching-cubes.mp4" type="video/mp4">
+    </video>
+</div>
+
+<div align="center">
+    <video width="80%" autoplay muted controls loop playsinline>
+    <source src="/assets/marching-cubes/in-game-demo.mp4" type="video/mp4">
+    </video>
+</div>
 
 <div class="tldr" markdown="1">
 # 🔑 Key takeaways
@@ -261,12 +270,9 @@ for storing vertices, indices, normals, etc.
 
 | Volume Resolution: | 32^3 | 64^3 | 128^3 |
 | :--- | :---: | :---: | :--- |
-| Vertices | 1.14 MB  | 9.29 MB | 74.91 MB |
-| Indices | 1.79 MB  | 15.00 MB | 122.90 MB |
-| Normals | 1.14 MB  | 9.29 MB | 74.91 MB |
 | VertexEdges | 0.38 MB  | 3.10 MB | 24.97 MB |
 | IndexByVertex | 0.38 MB  | 3.10 MB | 24.97 MB |
-| **Total Memory Usage** | **4.83 MB**  | **39.78 MB** | **322.66 MB** |
+| **Total Additional Memory Usage** | **0.76 MB**  | **6.20 MB** | **49.94 MB** |
 
 ## Usage In Game
 
